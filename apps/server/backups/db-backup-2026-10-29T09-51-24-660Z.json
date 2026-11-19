@@ -1,0 +1,792 @@
+{
+  "createdAt": "2026-10-29T09:51:24.660Z",
+  "tables": {
+    "user": [
+      {
+        "id": "cmvlmxtsg0000tmpgq6a40fgx",
+        "fullName": "إدارة أكاديمية سراج",
+        "username": "siraj_admin",
+        "email": "admin@siraj.sa",
+        "passwordHash": "$2a$10$4Q.swXQdebYIF2zBc7zGs.1kt.kJHyScL8m7Vd3nOTIEepKxMsos2",
+        "whatsapp": null,
+        "role": "ADMIN",
+        "emailVerified": true,
+        "emailVerificationToken": null,
+        "universityId": null,
+        "majorId": null,
+        "status": "ACTIVE",
+        "createdAt": "2026-10-24T00:03:02.032Z",
+        "updatedAt": "2026-10-24T00:03:02.032Z"
+      },
+      {
+        "id": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "fullName": "مختبر المدرس",
+        "username": "teacher_e2e_694226",
+        "email": "teacher_694226@test.local",
+        "passwordHash": "$2a$10$shRsIMaRM0PBV55Zq2iJJOAyZj5u9wYV62/R1wuEI7r86kShDcbMu",
+        "whatsapp": "0512345678",
+        "role": "TEACHER",
+        "emailVerified": false,
+        "emailVerificationToken": "3c053928e749628b45295a37bf5d355a98db2aa7c2d4acce",
+        "universityId": null,
+        "majorId": null,
+        "status": "ACTIVE",
+        "createdAt": "2026-10-28T00:34:54.323Z",
+        "updatedAt": "2026-10-28T00:34:54.424Z"
+      },
+      {
+        "id": "cmvrdu8bz000jtmxsumjwdymn",
+        "fullName": "طالب اختبار",
+        "username": "student_e2e_694226",
+        "email": "student_694226@test.local",
+        "passwordHash": "$2a$10$q0jHW6nwWFpnD/qBX4QNEOPrNtZQKipTtEKRbwbJS.1zLKbR1F8fS",
+        "whatsapp": "0598765432",
+        "role": "STUDENT",
+        "emailVerified": false,
+        "emailVerificationToken": "600b164d73f35a5d1e203ab858bc3515bf02e6641408a89b",
+        "universityId": "cmvlmxtsn0001tmpgxg4vpwql",
+        "majorId": "cmvrdu7vz0003tmxstwd7lahv",
+        "status": "ACTIVE",
+        "createdAt": "2026-10-28T00:34:54.767Z",
+        "updatedAt": "2026-10-28T00:34:54.767Z"
+      }
+    ],
+    "teacherProfile": [
+      {
+        "id": "cmvrdu7zr0008tmxsjyn3s22z",
+        "userId": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "degree": "بكالوريوس علوم حاسب — اختبار دمج شامل للمنصة",
+        "bio": "مدرس تجريبي لأ مشروع اختبار الدمج الشامل — نبذة 20 حرفًا على الأقل.",
+        "specialties": [
+          "برمجة",
+          "قواعد بيانات"
+        ],
+        "universitiesText": null,
+        "status": "APPROVED",
+        "docsUrl": null,
+        "createdAt": "2026-10-28T00:34:54.327Z",
+        "updatedAt": "2026-10-28T00:34:54.424Z"
+      }
+    ],
+    "university": [
+      {
+        "id": "cmvlmxtsn0001tmpgxg4vpwql",
+        "name": "جامعة الملك سعود",
+        "slug": "جامعة-الملك-سعود",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 0,
+        "createdAt": "2026-10-24T00:03:02.040Z"
+      },
+      {
+        "id": "cmvlmxtsq0002tmpgzgor470z",
+        "name": "جامعة الإمام محمد بن سعود الإسلامية",
+        "slug": "جامعة-الإمام-محمد-بن-سعود-الإسلامية",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 1,
+        "createdAt": "2026-10-24T00:03:02.042Z"
+      },
+      {
+        "id": "cmvlmxtsr0003tmpgc0qmbq1h",
+        "name": "جامعة الملك سعود بن عبد العزيز للعلوم الصحية",
+        "slug": "جامعة-الملك-سعود-بن-عبد-العزيز-للعلوم-الصحية",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 2,
+        "createdAt": "2026-10-24T00:03:02.043Z"
+      },
+      {
+        "id": "cmvlmxtst0004tmpg5phhimiy",
+        "name": "جامعة الأميرة نورة بنت عبد الرحمن",
+        "slug": "جامعة-الأميرة-نورة-بنت-عبد-الرحمن",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 3,
+        "createdAt": "2026-10-24T00:03:02.045Z"
+      },
+      {
+        "id": "cmvlmxtsv0005tmpgpnfi5hmu",
+        "name": "جامعة الملك فهد الأهلية",
+        "slug": "جامعة-الملك-فهد-الأهلية",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 4,
+        "createdAt": "2026-10-24T00:03:02.047Z"
+      },
+      {
+        "id": "cmvlmxtsw0006tmpgm9yir9wt",
+        "name": "جامعة الأمير سلطان",
+        "slug": "جامعة-الأمير-سلطان",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 5,
+        "createdAt": "2026-10-24T00:03:02.048Z"
+      },
+      {
+        "id": "cmvlmxtsx0007tmpgzkm1quc2",
+        "name": "الجامعة السعودية الإلكترونية",
+        "slug": "الجامعة-السعودية-الإلكترونية",
+        "city": "الرياض",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 6,
+        "createdAt": "2026-10-24T00:03:02.050Z"
+      },
+      {
+        "id": "cmvlmxtsy0008tmpg3ll2quuy",
+        "name": "جامعة سلمان بن عبد العزيز",
+        "slug": "جامعة-سلمان-بن-عبد-العزيز",
+        "city": "الخرج",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 7,
+        "createdAt": "2026-10-24T00:03:02.051Z"
+      },
+      {
+        "id": "cmvlmxtt00009tmpgpz034dk8",
+        "name": "جامعة شقراء",
+        "slug": "جامعة-شقراء",
+        "city": "شقراء",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 8,
+        "createdAt": "2026-10-24T00:03:02.052Z"
+      },
+      {
+        "id": "cmvlmxtt1000atmpgptbsv3gs",
+        "name": "جامعة المجمعة",
+        "slug": "جامعة-المجمعة",
+        "city": "المجمعة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 9,
+        "createdAt": "2026-10-24T00:03:02.053Z"
+      },
+      {
+        "id": "cmvlmxtt2000btmpgginhrdsz",
+        "name": "جامعة الملك عبد العزيز",
+        "slug": "جامعة-الملك-عبد-العزيز",
+        "city": "جدة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 10,
+        "createdAt": "2026-10-24T00:03:02.055Z"
+      },
+      {
+        "id": "cmvlmxtt3000ctmpg37dmfqp5",
+        "name": "جامعة أم القرى",
+        "slug": "جامعة-أم-القرى",
+        "city": "مكة المكرمة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 11,
+        "createdAt": "2026-10-24T00:03:02.056Z"
+      },
+      {
+        "id": "cmvlmxtt5000dtmpg3ievx1ne",
+        "name": "جامعة الطائف",
+        "slug": "جامعة-الطائف",
+        "city": "الطائف",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 12,
+        "createdAt": "2026-10-24T00:03:02.057Z"
+      },
+      {
+        "id": "cmvlmxtt6000etmpgre4wk9jx",
+        "name": "جامعة الملك فهد للبترول والمعادن",
+        "slug": "جامعة-الملك-فهد-للبترول-والمعادن",
+        "city": "الظهران",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 13,
+        "createdAt": "2026-10-24T00:03:02.058Z"
+      },
+      {
+        "id": "cmvlmxtt7000ftmpgc8frbrwe",
+        "name": "جامعة الإمام عبد الرحمن بن فيصل",
+        "slug": "جامعة-الإمام-عبد-الرحمن-بن-فيصل",
+        "city": "الدمام",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 14,
+        "createdAt": "2026-10-24T00:03:02.060Z"
+      },
+      {
+        "id": "cmvlmxtt8000gtmpgvg0zmdb5",
+        "name": "جامعة الأمير محمد بن فهد",
+        "slug": "جامعة-الأمير-محمد-بن-فهد",
+        "city": "الخبر",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 15,
+        "createdAt": "2026-10-24T00:03:02.061Z"
+      },
+      {
+        "id": "cmvlmxtt9000htmpgr8j7h6a0",
+        "name": "جامعة الأمير محمد بن سلمان",
+        "slug": "جامعة-الأمير-محمد-بن-سلمان",
+        "city": "الجبيل",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 16,
+        "createdAt": "2026-10-24T00:03:02.062Z"
+      },
+      {
+        "id": "cmvlmxttb000itmpgqx7i4qp3",
+        "name": "جامعة الملك فيصل",
+        "slug": "جامعة-الملك-فيصل",
+        "city": "الأحساء",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 17,
+        "createdAt": "2026-10-24T00:03:02.063Z"
+      },
+      {
+        "id": "cmvlmxttc000jtmpgtqvakoax",
+        "name": "جامعة الملك خالد",
+        "slug": "جامعة-الملك-خالد",
+        "city": "أبها",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 18,
+        "createdAt": "2026-10-24T00:03:02.064Z"
+      },
+      {
+        "id": "cmvlmxttd000ktmpgrux4ljuc",
+        "name": "جامعة الأمير فهد بن سلطان",
+        "slug": "جامعة-الأمير-فهد-بن-سلطان",
+        "city": "خميس مشيط",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 19,
+        "createdAt": "2026-10-24T00:03:02.066Z"
+      },
+      {
+        "id": "cmvlmxtte000ltmpgk9llop5y",
+        "name": "جامعة القصيم",
+        "slug": "جامعة-القصيم",
+        "city": "بريدة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 20,
+        "createdAt": "2026-10-24T00:03:02.067Z"
+      },
+      {
+        "id": "cmvlmxttg000mtmpg9anwqwu7",
+        "name": "جامعة حائل",
+        "slug": "جامعة-حائل",
+        "city": "حائل",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 21,
+        "createdAt": "2026-10-24T00:03:02.069Z"
+      },
+      {
+        "id": "cmvlmxtti000ntmpgin621g42",
+        "name": "جامعة طيبة",
+        "slug": "جامعة-طيبة",
+        "city": "المدينة المنورة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 22,
+        "createdAt": "2026-10-24T00:03:02.070Z"
+      },
+      {
+        "id": "cmvlmxttj000otmpgspddnt7k",
+        "name": "جامعة تبوك",
+        "slug": "جامعة-تبوك",
+        "city": "تبوك",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 23,
+        "createdAt": "2026-10-24T00:03:02.071Z"
+      },
+      {
+        "id": "cmvlmxttk000ptmpgpkfh08bh",
+        "name": "جامعة الجوف",
+        "slug": "جامعة-الجوف",
+        "city": "سكاكا",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 24,
+        "createdAt": "2026-10-24T00:03:02.072Z"
+      },
+      {
+        "id": "cmvlmxttl000qtmpgmz0h33et",
+        "name": "جامعة القريات",
+        "slug": "جامعة-القريات",
+        "city": "القريات",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 25,
+        "createdAt": "2026-10-24T00:03:02.073Z"
+      },
+      {
+        "id": "cmvlmxttm000rtmpg1zli1g8u",
+        "name": "جامعة الحدود الشمالية",
+        "slug": "جامعة-الحدود-الشمالية",
+        "city": "عرعر",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 26,
+        "createdAt": "2026-10-24T00:03:02.074Z"
+      },
+      {
+        "id": "cmvlmxttn000stmpg1atwmo6n",
+        "name": "جامعة نجران",
+        "slug": "جامعة-نجران",
+        "city": "نجران",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 27,
+        "createdAt": "2026-10-24T00:03:02.076Z"
+      },
+      {
+        "id": "cmvlmxtto000ttmpg95xnx4mg",
+        "name": "جامعة جازان",
+        "slug": "جامعة-جازان",
+        "city": "جازان",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 28,
+        "createdAt": "2026-10-24T00:03:02.077Z"
+      },
+      {
+        "id": "cmvlmxttq000utmpg6jhw1vv9",
+        "name": "جامعة الباحة",
+        "slug": "جامعة-الباحة",
+        "city": "الباحة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 29,
+        "createdAt": "2026-10-24T00:03:02.078Z"
+      },
+      {
+        "id": "cmvlmxttr000vtmpgf2rqo8uz",
+        "name": "جامعة دار الحكمة",
+        "slug": "جامعة-دار-الحكمة",
+        "city": "جدة",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 30,
+        "createdAt": "2026-10-24T00:03:02.080Z"
+      },
+      {
+        "id": "cmvlmxtts000wtmpgqruauxoa",
+        "name": "جامعة عرار",
+        "slug": "جامعة-عرار",
+        "city": "الخبر",
+        "logoUrl": null,
+        "isVisible": true,
+        "order": 31,
+        "createdAt": "2026-10-24T00:03:02.081Z"
+      }
+    ],
+    "college": [
+      {
+        "id": "cmvrdu7v90001tmxs7a51cfmx",
+        "universityId": "cmvlmxtsn0001tmpgxg4vpwql",
+        "name": "كلية اختبار الحاسبات",
+        "createdAt": "2026-10-28T00:34:54.164Z"
+      }
+    ],
+    "major": [
+      {
+        "id": "cmvrdu7vz0003tmxstwd7lahv",
+        "universityId": "cmvlmxtsn0001tmpgxg4vpwql",
+        "collegeId": "cmvrdu7v90001tmxs7a51cfmx",
+        "name": "علوم حاسب (اختبار)",
+        "createdAt": "2026-10-28T00:34:54.191Z"
+      }
+    ],
+    "course": [
+      {
+        "id": "cmvrdu7wr0005tmxs7kz9qesq",
+        "universityId": "cmvlmxtsn0001tmpgxg4vpwql",
+        "collegeId": "cmvrdu7v90001tmxs7a51cfmx",
+        "majorId": "cmvrdu7vz0003tmxstwd7lahv",
+        "title": "مقرر اختبار CS101",
+        "code": "CS101",
+        "level": "المستوى 1",
+        "description": null,
+        "isVisible": true,
+        "coverUrl": null,
+        "createdAt": "2026-10-28T00:34:54.220Z",
+        "updatedAt": "2026-10-28T00:34:54.220Z"
+      }
+    ],
+    "courseOffering": [
+      {
+        "id": "cmvrdu861000ctmxsahf2z830",
+        "courseId": "cmvrdu7wr0005tmxs7kz9qesq",
+        "teacherId": "cmvrdu7zr0008tmxsjyn3s22z",
+        "title": "دورة اختبار كاملة للمنصة",
+        "summary": "شرح المقرر بالتفصيل خطوة خطوة اختبار",
+        "price": 150,
+        "trialVideoUrl": null,
+        "youtubeUrls": null,
+        "accessType": "PAID",
+        "status": "PUBLISHED",
+        "adminNote": null,
+        "createdAt": "2026-10-28T00:34:54.553Z",
+        "updatedAt": "2026-10-28T00:34:54.630Z"
+      }
+    ],
+    "lesson": [
+      {
+        "id": "cmvrdu86s000etmxs9xik0ult",
+        "offeringId": "cmvrdu861000ctmxsahf2z830",
+        "title": "مقدمة تجريبية",
+        "videoUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "access": "TRIAL",
+        "order": 0,
+        "createdAt": "2026-10-28T00:34:54.581Z"
+      },
+      {
+        "id": "cmvrdu87r000gtmxswyoo3eji",
+        "offeringId": "cmvrdu861000ctmxsahf2z830",
+        "title": "الفصل الأول المدفوع",
+        "videoUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "access": "PAID",
+        "order": 0,
+        "createdAt": "2026-10-28T00:34:54.615Z"
+      }
+    ],
+    "enrollment": [
+      {
+        "id": "cmvrdu8gl000rtmxsdzjp5pbh",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "offeringId": "cmvrdu861000ctmxsahf2z830",
+        "createdAt": "2026-10-28T00:34:54.934Z"
+      }
+    ],
+    "service": [],
+    "explainRequest": [
+      {
+        "id": "cmvrdu8iq000wtmxst9yq7gl6",
+        "studentId": "cmvrdu8bz000jtmxsumjwdymn",
+        "universityId": "cmvlmxtsn0001tmpgxg4vpwql",
+        "collegeId": null,
+        "majorId": null,
+        "courseTitle": "مادة اختبار",
+        "details": "شرح تفصيلي",
+        "type": "ONLINE",
+        "urgency": "WEEK",
+        "budget": null,
+        "deadline": null,
+        "attachments": null,
+        "linkUrl": null,
+        "status": "TEACHER_SELECTED",
+        "createdAt": "2026-10-28T00:34:55.010Z",
+        "updatedAt": "2026-10-28T00:34:55.116Z"
+      }
+    ],
+    "offer": [
+      {
+        "id": "cmvrdu8kv0011tmxsl3x90rex",
+        "requestId": "cmvrdu8iq000wtmxst9yq7gl6",
+        "teacherId": "cmvrdu7zr0008tmxsjyn3s22z",
+        "price": 200,
+        "message": "عرض جيد",
+        "timelineDays": 7,
+        "status": "ACCEPTED",
+        "createdAt": "2026-10-28T00:34:55.087Z",
+        "updatedAt": "2026-10-28T00:34:55.115Z"
+      }
+    ],
+    "order": [
+      {
+        "id": "cmvrdu8cx000ltmxsug2gol0s",
+        "orderNo": "SRJ-2026-000001",
+        "studentId": "cmvrdu8bz000jtmxsumjwdymn",
+        "targetType": "OFFERING",
+        "targetId": "cmvrdu861000ctmxsahf2z830",
+        "amount": 150,
+        "title": "دورة اختبار كاملة للمنصة",
+        "status": "PAID",
+        "notes": null,
+        "providerId": "cmvrdu7zr0008tmxsjyn3s22z",
+        "createdAt": "2026-10-28T00:34:54.802Z",
+        "updatedAt": "2026-10-28T00:34:54.928Z"
+      },
+      {
+        "id": "cmvrdu8ls0014tmxsb2bwmqys",
+        "orderNo": "SRJ-2026-000002",
+        "studentId": "cmvrdu8bz000jtmxsumjwdymn",
+        "targetType": "OFFER",
+        "targetId": "cmvrdu8kv0011tmxsl3x90rex",
+        "amount": 200,
+        "title": "مادة اختبار",
+        "status": "AWAITING_PAYMENT",
+        "notes": "مدة التنفيذ المتفق عليها: 7 يوم",
+        "providerId": "cmvrdu7zr0008tmxsjyn3s22z",
+        "createdAt": "2026-10-28T00:34:55.121Z",
+        "updatedAt": "2026-10-28T00:34:55.121Z"
+      }
+    ],
+    "payment": [
+      {
+        "id": "cmvrdu8ey000ntmxsv62hbaxh",
+        "orderId": "cmvrdu8cx000ltmxsug2gol0s",
+        "method": "TRANSFER",
+        "receiptUrl": "/uploads/1793147694859-dhrbst-receipt.png",
+        "status": "APPROVED",
+        "reviewerId": "cmvlmxtsg0000tmpgq6a40fgx",
+        "reviewNote": "سند صحيح (اختبار)",
+        "paidAt": "2026-10-28T00:34:54.924Z",
+        "createdAt": "2026-10-28T00:34:54.875Z"
+      }
+    ],
+    "chatRoom": [
+      {
+        "id": "cmvrdu8lv0016tmxs06nnf5bg",
+        "type": "ORDER",
+        "ownerId": null,
+        "title": "طلب: مادة اختبار",
+        "orderId": "cmvrdu8ls0014tmxsb2bwmqys",
+        "createdAt": "2026-10-28T00:34:55.123Z"
+      }
+    ],
+    "chatParticipant": [
+      {
+        "id": "cmvrdu8lv0018tmxswq4imhzm",
+        "roomId": "cmvrdu8lv0016tmxs06nnf5bg",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "role": "MEMBER",
+        "lastReadAt": null,
+        "createdAt": "2026-10-28T00:34:55.123Z"
+      },
+      {
+        "id": "cmvrdu8lv0019tmxsac7i9ubi",
+        "roomId": "cmvrdu8lv0016tmxs06nnf5bg",
+        "userId": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "role": "MEMBER",
+        "lastReadAt": null,
+        "createdAt": "2026-10-28T00:34:55.123Z"
+      }
+    ],
+    "message": [],
+    "chatReport": [],
+    "block": [],
+    "ad": [
+      {
+        "id": "cmvrdu8va001ctmxs5595uhhs",
+        "teacherId": "cmvrdu7zr0008tmxsjyn3s22z",
+        "title": "عرض اختبار للموسم",
+        "body": "خصم معدّل للأولى 5 أشخاص — تعديل جوهري للاختبار",
+        "imageUrl": null,
+        "linkUrl": null,
+        "status": "PENDING_REVIEW",
+        "reviewerNote": null,
+        "createdAt": "2026-10-28T00:34:55.462Z",
+        "updatedAt": "2026-10-28T00:34:55.560Z"
+      }
+    ],
+    "notification": [
+      {
+        "id": "cmvrdu8020009tmxsirdb0nsu",
+        "userId": "cmvlmxtsg0000tmpgq6a40fgx",
+        "title": "مدرس جديد بانتظار المراجعة",
+        "body": "مختبر المدرس أرسل طلب انضمام كمدرس.",
+        "link": "/admin/teachers?status=PENDING",
+        "isRead": false,
+        "type": "TEACHER_PENDING",
+        "createdAt": "2026-10-28T00:34:54.339Z"
+      },
+      {
+        "id": "cmvrdu82p000atmxsqa2mbovt",
+        "userId": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "title": "تم تفعيل حسابك كمدرس",
+        "body": "مبروك! يمكنك الآن النشر في الدورات والعروض والإعلانات والجلسات المباشرة.",
+        "link": null,
+        "isRead": false,
+        "type": "TEACHER_APPROVED",
+        "createdAt": "2026-10-28T00:34:54.434Z"
+      },
+      {
+        "id": "cmvrdu88f000htmxs6wdc32x1",
+        "userId": "cmvlmxtsg0000tmpgq6a40fgx",
+        "title": "دورة جديدة منشورة",
+        "body": "مختبر المدرس نشر دورة على مقرر: مقرر اختبار CS101",
+        "link": "/admin/offerings?status=PUBLISHED",
+        "isRead": false,
+        "type": "OFFERING_PUBLISHED",
+        "createdAt": "2026-10-28T00:34:54.639Z"
+      },
+      {
+        "id": "cmvrdu8f6000otmxsw7729gpj",
+        "userId": "cmvlmxtsg0000tmpgq6a40fgx",
+        "title": "سند حوالة جديد بانتظار المراجعة",
+        "body": "طالب اختبار رفع سندًا للطلب SRJ-2026-000001 بمبلغ 150 ريال.",
+        "link": "/admin/payments?status=UNDER_REVIEW",
+        "isRead": false,
+        "type": "PAYMENT_SUBMITTED",
+        "createdAt": "2026-10-28T00:34:54.883Z"
+      },
+      {
+        "id": "cmvrdu8f9000ptmxstnzfvuw4",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "title": "استلمنا سندك",
+        "body": "سند الطلب SRJ-2026-000001 بانتظار مراجعة الإدارة، وسنخبرك بالنتيجة قريبًا.",
+        "link": null,
+        "isRead": false,
+        "type": "PAYMENT_SUBMITTED",
+        "createdAt": "2026-10-28T00:34:54.885Z"
+      },
+      {
+        "id": "cmvrdu8h3000stmxs6qz57ajg",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "title": "تم اعتماد الدفعة",
+        "body": "اعتُمد سند الطلب SRJ-2026-000001. فُتح لك الوصول، أهلاً بك!",
+        "link": "/orders/cmvrdu8cx000ltmxsug2gol0s",
+        "isRead": false,
+        "type": "PAYMENT_APPROVED",
+        "createdAt": "2026-10-28T00:34:54.951Z"
+      },
+      {
+        "id": "cmvrdu8h5000ttmxsz10rdvdd",
+        "userId": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "title": "دفعة جديدة معتمدة لصالحك",
+        "body": "اعتُمد سند طلب SRJ-2026-000001 بمبلغ 150 ريال.",
+        "link": "/orders/cmvrdu8cx000ltmxsug2gol0s",
+        "isRead": false,
+        "type": "PAYMENT_APPROVED",
+        "createdAt": "2026-10-28T00:34:54.954Z"
+      },
+      {
+        "id": "cmvrdu8h7000utmxspzowgml6",
+        "userId": "cmvlmxtsg0000tmpgq6a40fgx",
+        "title": "اعتمدت سندًا",
+        "body": "الطلب SRJ-2026-000001.",
+        "link": null,
+        "isRead": false,
+        "type": "PAYMENT_REVIEWED",
+        "createdAt": "2026-10-28T00:34:54.955Z"
+      },
+      {
+        "id": "cmvrdu8j2000xtmxsuwdlan4k",
+        "userId": "cmvlmxtsg0000tmpgq6a40fgx",
+        "title": "طلب شرح جديد بانتظار المراجعة",
+        "body": "طالب اختبار طلب شرح: مادة اختبار",
+        "link": "/admin/requests?status=PENDING_REVIEW",
+        "isRead": false,
+        "type": "REQUEST_NEW",
+        "createdAt": "2026-10-28T00:34:55.022Z"
+      },
+      {
+        "id": "cmvrdu8j3000ytmxsdah169oo",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "title": "تم استلام طلب شرحك",
+        "body": "سيُنشر طلبك بعد مراجعة الإدارة، وسيتقدّم المدرسون بعروضهم.",
+        "link": null,
+        "isRead": false,
+        "type": "REQUEST_NEW",
+        "createdAt": "2026-10-28T00:34:55.023Z"
+      },
+      {
+        "id": "cmvrdu8k5000ztmxsldy3r299",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "title": "تم نشر طلبك",
+        "body": "نُشر طلب الشرح \"مادة اختبار\"، وسيتقدّم المدرس المفعّلون بعروضهم.",
+        "link": "/requests/cmvrdu8iq000wtmxst9yq7gl6",
+        "isRead": false,
+        "type": "REQUEST_PUBLISHED",
+        "createdAt": "2026-10-28T00:34:55.061Z"
+      },
+      {
+        "id": "cmvrdu8ky0012tmxspmhyfhnx",
+        "userId": "cmvrdu8bz000jtmxsumjwdymn",
+        "title": "عرض جديد على طلب شرحك",
+        "body": "مختبر المدرس قدّم عرضًا على طلبك \"مادة اختبار\" بسعر 200 ريال.",
+        "link": "/requests/cmvrdu8iq000wtmxst9yq7gl6",
+        "isRead": false,
+        "type": "OFFER_NEW",
+        "createdAt": "2026-10-28T00:34:55.090Z"
+      },
+      {
+        "id": "cmvrdu8ma001atmxs0zx32wzd",
+        "userId": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "title": "تم اختيار عرضك",
+        "body": "اختار الطالب عرضك على \"مادة اختبار\". أنشئ حساب دفع عبر التحويل البنكي وبدأت المحادثة.",
+        "link": "/orders/cmvrdu8ls0014tmxsb2bwmqys",
+        "isRead": false,
+        "type": "OFFER_ACCEPTED",
+        "createdAt": "2026-10-28T00:34:55.138Z"
+      },
+      {
+        "id": "cmvrdu8x6001dtmxs5w45cc9s",
+        "userId": "cmvrdu7zm0006tmxsbg3r0pdr",
+        "title": "اعتُمد إعلانك",
+        "body": null,
+        "link": null,
+        "isRead": false,
+        "type": "AD_APPROVED",
+        "createdAt": "2026-10-28T00:34:55.530Z"
+      }
+    ],
+    "liveSession": [],
+    "liveBooking": [],
+    "setting": [
+      {
+        "key": "telegram_link",
+        "value": "https://t.me/Siraj1Academy",
+        "updatedAt": "2026-10-24T00:03:01.921Z"
+      },
+      {
+        "key": "whatsapp_numbers",
+        "value": "[\"966549604202\",\"966579769007\"]",
+        "updatedAt": "2026-10-24T00:03:01.928Z"
+      },
+      {
+        "key": "payment_instructions",
+        "value": "حوّل المبلغ إلى الحساب البنكي الموضح في صفحة الطلب، ثم ارفع صورة السند من نفس الصفحة. تُراجع الإدارة السند خلال ساعات العمل، ولا يُعد الدفع مكتملًا إلا بعد الاعتماد.",
+        "updatedAt": "2026-10-24T00:03:01.929Z"
+      },
+      {
+        "key": "iban",
+        "value": "",
+        "updatedAt": "2026-10-24T00:03:01.930Z"
+      },
+      {
+        "key": "bank_name",
+        "value": "",
+        "updatedAt": "2026-10-24T00:03:01.932Z"
+      },
+      {
+        "key": "commission_rate",
+        "value": "0.15",
+        "updatedAt": "2026-10-24T00:03:01.934Z"
+      },
+      {
+        "key": "platform_name_ar",
+        "value": "أكاديمية سراج التعليمية",
+        "updatedAt": "2026-10-24T00:03:01.935Z"
+      },
+      {
+        "key": "platform_name_en",
+        "value": "Siraj Educational Academy",
+        "updatedAt": "2026-10-24T00:03:01.937Z"
+      },
+      {
+        "key": "faq",
+        "value": "[{\"q\":\"كيف أستفيد من شروحات المدرسين؟\",\"a\":\"تصفح جامعتك ثم مقررك، اختر دورة مفعّلة، حجزها، ثم ارفع سند الحوالة وانتظر اعتماد الإدارة.\"},{\"q\":\"كيف أطلب شرحًا لمقرر؟\",\"a\":\"من حسابك الطلابي أنشئ طلب شرحًا؛ بعد موافقة الإدارة يُنشر ويُقدّم المدرسون المفعّلون عروضهم.\"},{\"q\":\"متى يظهر حساب المدرس؟\",\"a\":\"بعد مراجعة الإدارة واعتماده؛ لا يظهر محتوى أي مدرس قبل الاعتماد.\"},{\"q\":\"هل الدفع تلقائي؟\",\"a\":\"لا — الدفع تحويل بنكي يدوي، ولا يُعد مكتملًا إلا بعد اعتماد السند من الإدارة.\"}]",
+        "updatedAt": "2026-10-24T00:03:01.938Z"
+      },
+      {
+        "key": "service_intro",
+        "value": "خدمات شرح وتدريب أكاديمي ضمن لوائح النزاهة: تدريب وشرح وتوجيه — لا تسليم أعمال جاهزة تُقدَّم بدل الطالب.",
+        "updatedAt": "2026-10-24T00:03:01.939Z"
+      }
+    ],
+    "review": [],
+    "favorite": []
+  }
+}

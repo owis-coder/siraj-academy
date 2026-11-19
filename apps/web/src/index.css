@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ============================================================
+     ثيم سراج الفاتح (Light Theme - الأبيض الافتراضي)
+     تباين عالي وألوان ملكية راقية وقراءة مريحة
+     ============================================================ */
+  --color-page: 248 249 250;          /* #F8F9FA خلفية ناصعة مريحة للعين */
+  --color-surface: 255 255 255;       /* #FFFFFF بطاقات وألواح بيضاء نقية */
+  --color-surface-2: 241 243 245;     /* #F1F3F5 أسطح ثانوية و hover */
+  --color-elevated: 233 236 239;      /* #E9ECEF حقول الإدخال والوسوم */
+  --color-line: 226 230 234;          /* #E2E6EA حدود واضحة أنيقة */
+  --color-line-gold: rgba(185, 138, 78, 0.38);
+
+  --color-ink-primary: 24 24 27;      /* #18181B نصوص أساسية شديدة الوضوح والتباين */
+  --color-ink-secondary: 75 85 99;    /* #4B5563 نصوص ثانوية بنسبة تباين عالية */
+  --color-ink-muted: 107 114 128;     /* #6B7280 نصوص فرعية وهوامش */
+
+  /* التدرجات الذهبية للوضع الفاتح (درجات برونزية وذهبية ملكية غنية للقراءة على الأبيض) */
+  --color-gold-200: 140 91 20;        /* #8C5B14 برونزي ذهبي غني عالي التباين */
+  --color-gold-300: 158 106 27;       /* #9E6A1B ذهبي داكن واضح */
+  --color-gold-400: 184 123 34;       /* #B87B22 ذهبي متوسط */
+  --color-gold-500: 201 150 75;       /* #C9964B ذهبي سراج الأساسي */
+
+  --bg-gold-text: linear-gradient(135deg, #7A4E0E, #A9721D 50%, #C9964B);
+  --color-glass: rgba(255, 255, 255, 0.88);
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 12px 28px -8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(185, 138, 78, 0.32), 0 0 20px -4px rgba(185, 138, 78, 0.12);
+  --shadow-glow: 0 0 20px -6px rgba(185, 138, 78, 0.35);
+
+  --scrollbar-thumb: #CBD5E1;
+  --scrollbar-thumb-hover: #94A3B8;
+
+  color-scheme: light;
+}
+
+.dark {
+  /* ============================================================
+     ثيم سراج الداكن (Dark Theme - الهوية الأصلية الحالية)
+     فحمي عميق بلمسات ذهبية دافئة
+     ============================================================ */
+  --color-page: 23 21 19;             /* #171513 فحمي عميق */
+  --color-surface: 34 31 28;          /* #221F1C سطح البطاقات الداكنة */
+  --color-surface-2: 46 43 41;        /* #2E2B29 سطح الشعار */
+  --color-elevated: 53 50 46;         /* #35322E حقول الإدخال */
+  --color-line: 59 55 51;             /* #3B3733 حدود ناعمة */
+  --color-line-gold: rgba(201, 150, 75, 0.28);
+
+  --color-ink-primary: 245 241 234;   /* #F5F1EA نصوص بيضاء دافئة */
+  --color-ink-secondary: 201 195 184; /* #C9C3B8 نصوص ثانوية ناعمة */
+  --color-ink-muted: 143 136 124;     /* #8F887C نصوص فرعية */
+
+  /* التدرجات الذهبية للوضع الداكن (مضيئة وفخمة على الداكن) */
+  --color-gold-200: 234 200 127;     /* #EAC87F ذهبي فاتح مشرق */
+  --color-gold-300: 225 171 63;      /* #E1AB3F ذهبي العلامة المشرق */
+  --color-gold-400: 217 166 85;      /* #D9A655 ذهبي متوسط */
+  --color-gold-500: 201 150 75;      /* #C9964B ذهبي سراج الأساسي */
+
+  --bg-gold-text: linear-gradient(135deg, #B98A4E, #EAC87F 55%, #F3E3C0);
+  --color-glass: rgba(34, 31, 28, 0.72);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-card-hover: 0 10px 30px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(201, 150, 75, 0.28), 0 0 24px -6px rgba(201, 150, 75, 0.18);
+  --shadow-glow: 0 0 24px -8px rgba(201, 150, 75, 0.35);
+
+  --scrollbar-thumb: #3B3733;
+  --scrollbar-thumb-hover: #4A453F;
+
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-page text-ink-primary font-sans antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+::selection {
+  background: rgba(201, 150, 75, 0.35);
+}
+
+/* Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .gold-text {
+    @apply bg-gold-text bg-clip-text text-transparent;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-[10px] bg-gold-grad px-5 py-2.5 text-sm font-semibold text-cham shadow-glow transition-all duration-200 hover:brightness-110 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-gold-300/60 disabled:opacity-60 disabled:pointer-events-none;
+  }
+
+  .hero-pattern {
+    background-image:
+      radial-gradient(ellipse 60% 50% at 85% 10%, rgba(201, 150, 75, 0.12), transparent 60%),
+      radial-gradient(ellipse 40% 40% at 10% 90%, rgba(46, 150, 168, 0.08), transparent 60%),
+      linear-gradient(rgba(185, 138, 78, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(185, 138, 78, 0.08) 1px, transparent 1px);
+    background-size: auto, auto, 56px 56px, 56px 56px;
+    mask-image: linear-gradient(to bottom, black 55%, transparent);
+  }
+
+  .dark .hero-pattern {
+    background-image:
+      radial-gradient(ellipse 60% 50% at 85% 10%, rgba(201, 150, 75, 0.09), transparent 60%),
+      radial-gradient(ellipse 40% 40% at 10% 90%, rgba(46, 150, 168, 0.05), transparent 60%),
+      linear-gradient(rgba(59, 55, 51, 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59, 55, 51, 0.35) 1px, transparent 1px);
+  }
+
+  .glass {
+    background: var(--color-glass);
+    backdrop-filter: blur(12px);
+  }
+
+  .input-base {
+    @apply w-full rounded-[10px] border border-line bg-elevated/60 px-3.5 py-2.5 text-sm text-ink-primary placeholder:text-ink-muted/70 transition-colors focus:border-gold-500/60 focus:outline-none focus:ring-2 focus:ring-gold-500/20 disabled:opacity-60;
+  }
+}
+
+@layer utilities {
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

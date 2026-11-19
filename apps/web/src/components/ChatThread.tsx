@@ -1,0 +1,114 @@
+import { useEffect, useRef, useState } from 'react';
+import { api, type ChatMessage, type ChatRoom, type User } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { Button, Input, EmptyState, Spinner } from './ui';
+import { formatDateTime } from '../lib/format';
+import { useI18n } from '../i18n';
+import { IconAttachment } from './icons';
+
+/** محادثة تشغيل بـ Polling (كل 3 ثوان) + إرفاق مرفق */
+export function ChatThread({ room }: { room: ChatRoom | null }) {
+  const { user } = useAuth();
+  const { t } = useI18n();
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMsgs([]);
+    if (!room) return;
+    let alive = true;
+    const load = async () => {
+      try {
+        const { data } = await api.chat.messages(room.id);
+        if (alive && user) setMsgs(data ?? []);
+        await api.chat.read(room.id).catch(() => {});
+      } catch { /* تجاهل */ }
+    };
+    setLoading(true);
+    load().finally(() => alive && setLoading(false));
+    const timer = setInterval(load, 3000);
+    return () => { alive = false; clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.id]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs.length]);
+
+  const send = async (file?: File | null) => {
+    if (!room || (!text.trim() && !file)) return;
+    setSending(true);
+    try {
+      let attachmentUrl: string | undefined;
+      if (file) attachmentUrl = (await api.uploads.create(file)).data.url;
+      await api.chat.send(room.id, { body: text.trim() || undefined, attachmentUrl });
+      setText('');
+      const { data } = await api.chat.messages(room.id);
+      setMsgs(data ?? []);
+    } catch { /* يُعرض الخطأ من الصفحة المستضيفة */ }
+    finally { setSending(false); }
+  };
+
+  if (!room) return <EmptyState title={t('chat.pickRoom')} hint={t('chat.pickRoomHint')} compact />;
+  const peer = (room.participants ?? []).find((p: User) => p.id !== user?.id);
+
+  return (
+    <div className="flex h-[calc(100vh-190px)] min-h-96 flex-col rounded-lg border border-line bg-surface">
+      <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
+        <span className="grid size-9 place-items-center rounded-full border border-line-gold text-sm text-gold-200" aria-hidden>
+          {(peer?.fullName ?? room.title ?? t('chat.fallbackName')).charAt(0)}
+        </span>
+        <div>
+          <p className="text-sm font-semibold">{room.title ?? peer?.fullName ?? t('chat.fallback')}</p>
+          <p className="text-[11px] text-ink-muted">{room.type === 'DIRECT' ? t('chat.direct') : t('chat.group')}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto p-5">
+        {loading && <div className="grid place-items-center py-6"><Spinner /></div>}
+        {msgs.length === 0 && !loading && <p className="py-10 text-center text-sm text-ink-muted">{t('chat.noMessages')}</p>}
+        {msgs.map((m) => {
+          const mine = m.senderId === user?.id;
+          return (
+            <div key={m.id} className={`flex ${mine ? 'flex-row-reverse justify-start' : ''}`}>
+              <div className={`max-w-[75%] rounded-lg px-4 py-2.5 text-sm leading-6 ${mine ? 'border border-gold/30 bg-gold-500/15' : 'border border-line bg-elevated'}`}>
+                {m.body && <p className="whitespace-pre-line text-ink-primary">{m.body}</p>}
+                {m.attachmentUrl && (
+                  <a href={m.attachmentUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-teal hover:underline">
+                    <IconAttachment className="size-3.5" />
+                    <span>{t('chat.attachment')}</span>
+                  </a>
+                )}
+                <p className="mt-1 text-[10px] text-ink-muted">{formatDateTime(m.createdAt)}</p>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="border-t border-line p-3">
+        <div className="flex items-center gap-2">
+          <label className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-md border border-line text-ink-muted transition-colors hover:text-gold-200" title={t('chat.attach')}>
+            <IconAttachment className="size-4" />
+            <input
+              type="file"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void send(f); e.target.value = ''; }}
+            />
+          </label>
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t('chat.placeholder')}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          />
+          <Button size="sm" loading={sending} onClick={() => void send()}>{t('common.send')}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}

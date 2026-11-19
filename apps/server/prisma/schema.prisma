@@ -1,0 +1,847 @@
+// ============================================================
+// أكاديمية سراج التعليمية — مخطط قاعدة البيانات (PostgreSQL)
+//.community contract: docs/api-contract.md
+// ملاحظات نزاهة: لا بيانات وهمية — كل حالات الطلبات/الدفع تُدار
+// سيرًا حقيقيًا من الـAPI (لا نجاح تلقائي للدفع، لا إدخال يدوي للمراجعات).
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- التعدادات ----------
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum TeacherStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum AccessType {
+  TRIAL
+  PAID
+}
+
+enum OfferingStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  HIDDEN
+  REJECTED
+}
+
+enum ExplainRequestStatus {
+  PENDING_REVIEW
+  OPEN
+  TEACHER_SELECTED
+  CLOSED
+  REJECTED
+}
+
+enum ExplainType {
+  ONLINE
+  IN_PERSON
+  BOTH
+}
+
+enum Urgency {
+  NOW
+  DAY
+  WEEK
+  TERM
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum OrderTargetType {
+  OFFERING
+  SERVICE
+  OFFER
+  CUSTOM
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  AWAITING_REVIEW
+  REJECTED
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  TRANSFER
+  GATEWAY
+}
+
+enum PaymentStatus {
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ChatRoomType {
+  DIRECT
+  GROUP
+  ORDER
+}
+
+enum ChatRole {
+  MEMBER
+  ADMIN
+}
+
+enum ChatReportStatus {
+  NEW
+  RESOLVED
+}
+
+enum AdStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  HIDDEN
+  EXPIRED
+}
+
+enum ServiceCategory {
+  PRIVATE_EXPLAIN        // شرح خاص
+  LIVE_EXPLAIN           // شرح مباشر
+  SUMMARY                // تلخيص (تدريب على التلخيص)
+  TRANSLATION            // ترجمة (تدريب على الترجمة)
+  PPT                    // عروض تقديمية (تدريب)
+  PROGRAMMING_PROJECT    // مشاريع برمجية (تدريب)
+  RESEARCH_REVIEW        // مراجعة بحث (توجيه)
+  PROOFREADING           // تدقيق لغوي (تدريب)
+  ACADEMIC_FORMAT        // تنسيق أكاديمي (تدريب)
+  HOMEWORK_TRAINING      // حل وتمرين واجبات
+  ACADEMIC_CONSULT       // استشارة أكاديمية
+  CUSTOM                 // مخصصة
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum FavoriteTargetType {
+  SERVICE
+  OFFERING
+  TEACHER
+}
+
+enum AuthTokenType {
+  PASSWORD_RESET
+  EMAIL_CHANGE
+  EMAIL_VERIFY
+}
+
+// ---------- المستخدمون ----------
+
+model User {
+  id                     String          @id @default(cuid())
+  fullName               String
+  username               String          @unique
+  email                  String          @unique
+  passwordHash           String
+  whatsapp               String?
+  role                   Role            @default(STUDENT)
+  emailVerified          Boolean         @default(false)
+  emailVerifiedAt        DateTime?       // وقت التوثيق الفعلي (للعرض وسجل التدقيق)
+  emailVerificationToken String?          @db.VarChar(255)
+  universityId           String?
+  majorId                String?
+  status                 UserStatus      @default(ACTIVE)
+  level                  String?         // المستوى الدراسي للطالب
+  avatarUrl              String?         // صورة الملف الشخصي (ملف محلي باسم يورده الخادم)
+  pendingEmail           String?         // بريد جديد بانتظار التحقق — لا يُعتمد تلقائيًا
+  sessionVersion         Int             @default(0) // يزداد لإبطال كل الجلسات القديمة
+  totpSecret             String?         // سر المصادقة الثنائية (TOTP base32)
+  totpEnabled            Boolean         @default(false) // هل المصادقة الثنائية مفعّلة
+  totpBackupCodes        String?         // رموز الاسترجاع الاحتياطية (تجزئات SHA-256 بتنسيق JSON)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  university University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  major      Major?      @relation(fields: [majorId], references: [id], onDelete: SetNull)
+
+  teacherProfile         TeacherProfile?
+  explainRequests        ExplainRequest[]       @relation("StudentRequests")
+  customRequests         CustomServiceRequest[] @relation("UserCustomRequests")
+  orders                 Order[]                @relation("StudentOrders")
+  enrollments      Enrollment[]
+  paymentsReviewed Payment[]        @relation("PaymentReviewer")
+  messages         Message[]
+  chatParticipants ChatParticipant[]
+  ownedRooms       ChatRoom[]       @relation("RoomOwner")
+  notifications    Notification[]
+  liveBookings     LiveBooking[]
+  reviews          Review[]
+  favorites        Favorite[]
+  reportedChats    ChatReport[]
+  blockedBy        Block[]          @relation("BlockTarget")
+  blocking         Block[]          @relation("BlockOwner")
+  sessions         UserSession[]
+  authTokens       AuthToken[]
+  auditLogs        AuditLog[]
+
+  @@index([role])
+  @@index([status])
+}
+
+// ---------- رموز الأمان لمرة واحدة (استعادة كلمة المرور / تغيير البريد) ----------
+// يُخزَّن تجزئة الرمز (SHA-256) فقط، ولا يُخزَّن الرمز الأصلي إطلاقًا.
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String        @unique
+  newEmail  String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+// ---------- سجل الجلسات والأجهزة ----------
+// لا يُخزَّن رمز الجلسة ولا ملفات تعريف الارتباط هنا — فقط بيانات وصفية.
+model UserSession {
+  id         String    @id @default(cuid())
+  userId     String
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  endedAt    DateTime?
+  endReason  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastSeenAt])
+}
+
+// ---------- سجل التدقيق الشامل ----------
+// لا تُسجَّل هنا كلمات المرور أو الرموز أو الجلسات أو أي سر — القيم الحساسة تُحجب.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorRole  String?
+  action     String
+  category   String   @default("ACCOUNT")
+  result     String   @default("SUCCESS")
+  reason     String?
+  targetType String?
+  targetId   String?
+  ip         String?
+  userAgent  String?
+  requestId  String?
+  oldValues  Json?
+  newValues  Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model TeacherProfile {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  degree          String
+  bio             String
+  specialties     String[]
+  universitiesText String?
+  status          TeacherStatus @default(PENDING)
+  docsUrl         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  offerings    CourseOffering[]
+  services     Service[]        @relation("ServiceProvider")
+  offers       Offer[]
+  ads          Ad[]
+  liveSessions LiveSession[]
+  providedOrders Order[]        @relation("OrderProvider")
+
+  @@index([status])
+}
+
+// ---------- تصفح: جامعة -> كلية -> تخصص -> مقرر ----------
+
+model University {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  city      String?
+  logoUrl   String?
+  isVisible Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  colleges        College[]
+  majors          Major[]
+  courses         Course[]
+  students        User[]
+  explainRequests ExplainRequest[]
+
+  @@index([isVisible])
+}
+
+model College {
+  id           String   @id @default(cuid())
+  universityId String
+  name         String
+  createdAt    DateTime @default(now())
+
+  university      University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  majors          Major[]
+  courses         Course[]
+  explainRequests ExplainRequest[]
+
+  @@index([universityId])
+}
+
+// التخصص يمكن ربطه بالجامعة مباشرة أو بالكلية (collegeId اختياري)
+model Major {
+  id           String   @id @default(cuid())
+  universityId String
+  collegeId    String?
+  name         String
+  createdAt    DateTime @default(now())
+
+  university      University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  college         College?   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  users           User[]
+  courses         Course[]
+  explainRequests ExplainRequest[]
+
+  @@index([universityId])
+  @@index([collegeId])
+}
+
+model Course {
+  id          String    @id @default(cuid())
+  universityId String
+  collegeId   String?
+  majorId     String?
+  title       String
+  code        String?
+  level       String?
+  description String?
+  isVisible   Boolean   @default(true)
+  coverUrl    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  university University    @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  college    College?      @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  major      Major?        @relation(fields: [majorId], references: [id], onDelete: SetNull)
+  offerings  CourseOffering[]
+
+  @@index([universityId])
+  @@index([collegeId])
+  @@index([majorId])
+  @@index([isVisible])
+}
+
+// ---------- الدورات (CourseOffering) والدروس ----------
+
+model CourseOffering {
+  id            String         @id @default(cuid())
+  courseId      String
+  teacherId     String
+  title         String?
+  summary       String
+  price         Float
+  trialVideoUrl String?
+  youtubeUrls   Json?
+  accessType    AccessType     @default(PAID)
+  status        OfferingStatus @default(DRAFT)
+  adminNote     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher      TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  lessons      Lesson[]
+  enrollments  Enrollment[]
+  reviews      Review[]
+  liveSessions LiveSession[]
+
+  @@index([courseId])
+  @@index([teacherId])
+  @@index([status])
+  @@index([courseId, status])
+}
+
+model Lesson {
+  id         String     @id @default(cuid())
+  offeringId String
+  title      String
+  videoUrl   String
+  access     AccessType @default(PAID)
+  order      Int        @default(0)
+  createdAt  DateTime   @default(now())
+
+  offering CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+
+  @@index([offeringId, order])
+}
+
+model Enrollment {
+  id         String   @id @default(cuid())
+  userId     String
+  offeringId String
+  createdAt  DateTime @default(now())
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offering CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offeringId])
+  @@index([userId])
+  @@index([offeringId])
+}
+
+// ---------- الخدمات ----------
+
+model Service {
+  id           String          @id @default(cuid())
+  slug         String          @unique
+  title        String
+  category     ServiceCategory
+  description  String
+  basePrice    Float?
+  durationDays Int?
+  providerId   String?
+  isActive     Boolean         @default(true)
+  isFeatured   Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  provider TeacherProfile? @relation("ServiceProvider", fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([category])
+  @@index([providerId])
+}
+
+// ---------- طلبات الشرح والعروض ----------
+
+model ExplainRequest {
+  id           String   @id @default(cuid())
+  studentId    String
+  universityId String?
+  collegeId    String?
+  majorId      String?
+  courseTitle  String
+  details      String
+  type         ExplainType @default(ONLINE)
+  urgency      Urgency     @default(WEEK)
+  budget       Float?
+  deadline     String?     // نص حر: "قبل منتصف الأسبوع القادم" إلخ
+  attachments  Json?
+  linkUrl      String?
+  status       ExplainRequestStatus @default(PENDING_REVIEW)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  student    User       @relation("StudentRequests", fields: [studentId], references: [id], onDelete: Cascade)
+  university University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  college    College?    @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  major      Major?      @relation(fields: [majorId], references: [id], onDelete: SetNull)
+  offers     Offer[]
+
+  @@index([studentId])
+  @@index([status])
+  @@index([universityId])
+}
+
+model Offer {
+  id           String      @id @default(cuid())
+  requestId    String
+  teacherId    String
+  price        Float
+  message      String?
+  timelineDays Int?
+  status       OfferStatus @default(PENDING)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  request ExplainRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  teacher TeacherProfile  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, teacherId])
+  @@index([teacherId])
+  @@index([status])
+}
+
+// ---------- الطلبات والدفع (تحويل بنكي يدوي — لا نجاح تلقائي) ----------
+
+model Order {
+  id         String          @id @default(cuid())
+  orderNo    String          @unique
+  studentId  String
+  targetType OrderTargetType
+  targetId   String?
+  amount     Float
+  title      String
+  status     OrderStatus     @default(AWAITING_PAYMENT)
+  notes      String?
+  providerId String?         // المدرس المستفيد (للعروض/الدورات/الجلسات/الخدمات بآداء)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  student      User            @relation("StudentOrders", fields: [studentId], references: [id], onDelete: Cascade)
+  provider     TeacherProfile? @relation("OrderProvider", fields: [providerId], references: [id], onDelete: SetNull)
+  payments     Payment[]
+  chatRooms    ChatRoom[]      @relation("RoomOrder")
+  liveBookings LiveBooking[]   @relation("BookingOrder")
+
+  @@index([studentId])
+  @@index([status])
+  @@index([providerId])
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  orderId    String
+  method     PaymentMethod @default(TRANSFER)
+  receiptUrl String?
+  status     PaymentStatus @default(UNDER_REVIEW)
+  reviewerId String?
+  reviewNote String?
+  paidAt     DateTime?
+  createdAt  DateTime      @default(now())
+
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reviewer User?  @relation("PaymentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// ---------- المحادثات ----------
+
+model ChatRoom {
+  id        String       @id @default(cuid())
+  type      ChatRoomType @default(DIRECT)
+  ownerId   String?
+  title     String?
+  orderId   String?      // غرفة مرتبطة بطلب شرح/دورة
+  createdAt DateTime     @default(now())
+
+  owner        User?             @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  order        Order?            @relation("RoomOrder", fields: [orderId], references: [id], onDelete: Cascade)
+  participants ChatParticipant[]
+  messages     Message[]
+  reports      ChatReport[]
+
+  @@index([type])
+  @@index([orderId])
+}
+
+model ChatParticipant {
+  id         String    @id @default(cuid())
+  roomId     String
+  userId     String
+  role       ChatRole  @default(MEMBER)
+  lastReadAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  roomId        String
+  senderId      String
+  body          String?
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+
+  room    ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender  User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reports ChatReport[]
+
+  @@index([roomId, createdAt])
+}
+
+model ChatReport {
+  id         String           @id @default(cuid())
+  roomId     String
+  messageId  String?
+  reporterId String
+  reason     String
+  status     ChatReportStatus @default(NEW)
+  createdAt  DateTime         @default(now())
+
+  room     ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message  Message?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  reporter User      @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("BlockOwner", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockTarget", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+// ---------- إعلانات المدرسين (دورة حياة مفروضة على الخادم) ----------
+
+model Ad {
+  id           String   @id @default(cuid())
+  teacherId    String
+  title        String
+  body         String
+  imageUrl     String?
+  linkUrl      String?
+  status       AdStatus @default(DRAFT)
+  reviewerNote String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([status])
+}
+
+// ---------- الإشعارات ----------
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String?
+  link      String?
+  isRead    Boolean  @default(false)
+  type      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+// ---------- الجلسات المباشرة ----------
+
+model LiveSession {
+  id          String   @id @default(cuid())
+  offeringId  String?
+  teacherId   String
+  title       String
+  startsAt    DateTime
+  durationMin Int      @default(60)
+  price       Float?
+  capacity    Int?
+  createdAt   DateTime @default(now())
+
+  offering CourseOffering? @relation(fields: [offeringId], references: [id], onDelete: SetNull)
+  teacher  TeacherProfile  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  bookings LiveBooking[]
+
+  @@index([offeringId])
+  @@index([teacherId])
+  @@index([startsAt])
+}
+
+model LiveBooking {
+  id        String        @id @default(cuid())
+  sessionId String
+  userId    String
+  status    BookingStatus @default(CONFIRMED)
+  orderId   String?
+  createdAt DateTime      @default(now())
+
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order   Order?      @relation("BookingOrder", fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, userId])
+  @@index([userId])
+}
+
+// ---------- إعدادات المنصة ----------
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- التقييمات والمفضلة ----------
+
+model Review {
+  id         String   @id @default(cuid())
+  offeringId String
+  userId     String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  offering CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([offeringId, userId])
+  @@index([offeringId])
+}
+
+model Favorite {
+  id         String             @id @default(cuid())
+  userId     String
+  targetId   String
+  targetType FavoriteTargetType
+  createdAt  DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId, targetType])
+  @@index([userId])
+}
+
+// ---------- طلبات الخدمات المخصصة والشروحات غير المتوفرة ----------
+
+enum CustomRequestType {
+  COURSE_EXPLAIN      // شرح مقرر
+  TOPIC_EXPLAIN       // شرح موضوع
+  TRANSLATION         // ترجمة
+  SUMMARY             // تلخيص
+  PPT                 // عرض PowerPoint
+  PROGRAMMING_PROJECT // مشروع برمجي تعليمي
+  OTHER               // خدمة أخرى
+}
+
+enum CustomRequestStatus {
+  NEW                 // جديد
+  UNDER_REVIEW        // قيد المراجعة
+  AWAITING_RESPONSE   // بانتظار الرد
+  ACCEPTED            // قُبل
+  REJECTED            // رُفض
+  IN_PROGRESS         // قيد التنفيذ
+  COMPLETED           // مكتمل
+}
+
+model CustomServiceRequest {
+  id             String              @id @default(cuid())
+  requestNo      String              @unique
+  userId         String
+  requestType    CustomRequestType   @default(COURSE_EXPLAIN)
+  title          String              // اسم المقرر أو الخدمة
+  description    String              // الوصف التفصيلي
+  universityName String?             // الجامعة المرتبطة بالطلب
+  majorName      String?             // التخصص المرتبط بالطلب
+  academicLevel  String?             // المستوى الدراسي
+  deadline       String?             // الموعد المطلوب
+  budget         Float?              // الميزانية المقترحة
+  attachments    Json?               // قائمة بالمرفقات الآمنة
+  status         CustomRequestStatus @default(NEW)
+  adminNotes     String?             // ملاحظات داخلية للإدارة
+  emailSent      Boolean             @default(false)
+  emailError     String?
+  emailSentAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  user User @relation("UserCustomRequests", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([requestType])
+  @@index([createdAt])
+}
+
+// ---------- سجل الإشعارات البريدية (لمنع التكرار وإعادة المحاولة) ----------
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  type      String   // REGISTRATION, CUSTOM_REQUEST, STATUS_UPDATE
+  recipient String
+  subject   String
+  status    String   // SENT, FAILED, SIMULATED
+  error     String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([recipient])
+  @@index([createdAt])
+}
+
+// ---------- قائمة العناوين المحظورة (IP Blacklist / Jail) ----------
+model BlockedIp {
+  id         String    @id @default(cuid())
+  ip         String    @unique
+  reason     String
+  bannedAt   DateTime  @default(now())
+  expiresAt  DateTime? // إذا كان null فهو حظر دائم
+  bannedBy   String    @default("SYSTEM") // SYSTEM أو معرف الأدمن
+  permanent  Boolean   @default(false)
+
+  @@index([ip])
+  @@index([expiresAt])
+}
+
+// ---------- سجل الحوادث الأمنية المتقدمة (Security Incidents) ----------
+model SecurityIncident {
+  id         String    @id @default(cuid())
+  eventType  String    // RATE_LIMIT_BURST, BRUTE_FORCE, CAPTCHA_FAIL, PROBING, PRIVILEGE_ATTEMPT
+  severity   String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  ip         String?
+  userId     String?
+  endpoint   String?
+  details    Json?
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([severity])
+  @@index([ip])
+  @@index([createdAt])
+  @@index([resolved])
+}
+
+

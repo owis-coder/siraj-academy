@@ -1,0 +1,1 @@
+{\n  "compilerOptions": {\n    "types": ["vite/client"],\n    "noEmit": true\n  },\n  "include": ["src"],\n  "files": ["src/lib/accountRules.ts", "src/lib/accountRules.test.ts"]\n}

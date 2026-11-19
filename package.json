@@ -1,0 +1,16 @@
+{
+  "name": "siraj-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:server": "npm --prefix apps/server run dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "server": "npm --prefix apps/server run dev",
+    "web": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "seed": "npm --prefix apps/server run seed"
+  },
+  "dependencies": {
+    "vitest": "^5.0.5"
+  }
+}

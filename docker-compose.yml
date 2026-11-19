@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: siraj
+      POSTGRES_PASSWORD: siraj_dev_2024
+      POSTGRES_DB: siraj
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

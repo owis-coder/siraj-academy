@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-10-29T12:25:46.135Z",
+  "userIds": [],
+  "courseIds": [
+    "cmvte7yim0001tmbcab3xqqzb",
+    "cmvte7yjn0003tmbcotvs9jxr",
+    "cmvte7yka0005tmbc01kkd22f",
+    "cmvte7ykz0007tmbc1hmkjl8y",
+    "cmvte7ylo0009tmbc98bd7q6q",
+    "cmvte7ymc000btmbc7k3ti06y",
+    "cmvte7yn0000dtmbck1n57oc2",
+    "cmvte7ynm000ftmbcm6l8bx0b",
+    "cmvte7yoc000htmbcndgqiwqz"
+  ],
+  "collegeIds": [],
+  "majorIds": [],
+  "offeringIds": [
+    "cmvte7yow000jtmbcq6pv5vau",
+    "cmvte7yp6000ltmbc9vz9p7mx",
+    "cmvte7ypb000ntmbcy3pf9hc6",
+    "cmvte7ypi000ptmbcfz952kiz",
+    "cmvte7ypo000rtmbced71zoa0",
+    "cmvte7ypt000ttmbca8jrk6ds",
+    "cmvte7ypy000vtmbca0wsbal9",
+    "cmvte7yq3000xtmbcuiewef66",
+    "cmvte7yq8000ztmbcpwwfnrf0",
+    "cmvtg0htq0001tm5sd6f90zef",
+    "cmvtg0hu80003tm5sji4wep1p"
+  ],
+  "serviceIds": [
+    "cmvte7yt10021tmbcbfuljpuc",
+    "cmvte7yte0023tmbc1l152cwv",
+    "cmvte7ytj0025tmbcisb26g2n",
+    "cmvte7yto0027tmbcztm14y8o",
+    "cmvte7ytu0029tmbczeo2qhnj",
+    "cmvte7ytz002btmbc69133u9t",
+    "cmvte7yu4002dtmbcjtcrce08",
+    "cmvte7yu9002ftmbczntjwvqq"
+  ],
+  "adIds": [
+    "cmvte7z500047tmbcqkspkzsp",
+    "cmvte7z560049tmbct3vt0ft4",
+    "cmvte7z5b004btmbcw4wpgten"
+  ],
+  "orderIds": [
+    "cmvte7ywy002ztmbcwwzx97w7",
+    "cmvte7yyz0035tmbc952m1j7c",
+    "cmvte7yzs003btmbcid0mlau6",
+    "cmvte7yzy003dtmbce4rs95t9",
+    "cmvte7z0l003htmbcq19q7i82",
+    "cmvte7z17003ltmbcnqo4tt81",
+    "cmvte7z1d003ntmbc6uk7ftqs",
+    "cmvte7z20003rtmbcgqtzxa2v",
+    "cmvte7z25003ttmbc8wq9pq5w",
+    "cmvte7z2t003xtmbcp9bk1r6q",
+    "cmvte7z3h0041tmbcm1boe9xy",
+    "cmvte7z470045tmbc5kae4qfj"
+  ],
+  "roomIds": [
+    "cmvte7z69004dtmbc0b7hatx2",
+    "cmvte7z7o004qtmbcgxw79rwg",
+    "cmvte7z840051tmbcnihnguk6"
+  ],
+  "files": [
+    "cmvte2dxf0018tmtcnlgd52ia-demo-docs.pdf",
+    "cmvte2e2l001atmtctt6em0ic-demo-docs.pdf",
+    "cmvte2e81001ctmtcqkubckjc-demo-docs.pdf",
+    "seed-cover-math101.png",
+    "seed-cover-phy101.png",
+    "seed-cover-acc101.png",
+    "seed-cover-cs201.png",
+    "seed-cover-math204.png",
+    "seed-cover-eng101.png",
+    "seed-cover-mgt210.png",
+    "seed-cover-ai101.png",
+    "seed-cover-cs110.png",
+    "cmvte2fbr001ytmtc8s70p2d0-demo-request-db.png",
+    "cmvte2eiw001otmtcf8ubql3s-demo-receipt-0001.png",
+    "cmvte2enh001qtmtc9qmcbhx1-demo-receipt-0002.png",
+    "cmvte2ezd001utmtct5t4nknx-demo-receipt-0004.png",
+    "cmvte2f5i001wtmtcwqso1sqa-demo-receipt-0005.png",
+    "cmvte2fns0022tmtcbpxkmo3y-demo-receipt-0007.png",
+    "cmvte2fht0020tmtcymveqaky-demo-receipt-0009.png",
+    "cmvte2fzk0026tmtc6ea7vb5l-demo-receipt-0010.png",
+    "cmvte2ftn0024tmtcu3txhvoq-demo-receipt-0011.png",
+    "cmvte2dxf0018tmtcnlgd52ia-demo-ad-db.png",
+    "cmvte2eiw001otmtcf8ubql3s-demo-chat-question.png"
+  ]
+}
