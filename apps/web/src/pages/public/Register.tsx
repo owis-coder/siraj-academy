@@ -214,7 +214,7 @@ export default function Register() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
                 autoComplete="username"
-                placeholder={t('register.usernamePlaceholder')}
+                placeholder=""
                 aria-invalid={unameInvalid}
                 aria-describedby="username-status"
                 className={`pe-11 text-start ${unameInvalid ? 'border-danger/70' : unameStatus === 'available' ? 'border-ok/70' : ''}`}

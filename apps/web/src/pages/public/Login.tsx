@@ -144,7 +144,13 @@ export default function Login() {
         <p className="mb-6 text-sm text-ink-muted">{t('login.subtitle')}</p>
         <Form onSubmit={submit} className="space-y-4">
           <Field label={t('login.identifier')} required>
-            <Input dir="ltr" autoComplete="username" value={identifier} onChange={(e) => setIdentifier(e.target.value)} />
+            <Input
+              dir="ltr"
+              autoComplete="username"
+              placeholder=""
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+            />
           </Field>
           <Field label={t('common.password')} required>
             <PasswordInput
