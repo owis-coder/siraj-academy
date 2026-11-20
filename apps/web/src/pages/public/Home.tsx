@@ -9,7 +9,6 @@ import {
   IconBank,
   IconRequests,
   IconCheck,
-  IconSecurity,
   IconArrowForward,
 } from '../../components/icons';
 
@@ -58,26 +57,18 @@ export default function Home() {
       {/* ============ Hero ============ */}
       <section className="relative overflow-hidden border-b border-line/50">
         <div className="hero-pattern absolute inset-0" aria-hidden />
-        <div className="container-x relative grid items-center gap-10 py-20 lg:grid-cols-2 lg:py-28">
-          <div className="animate-fadeUp">
+        <div className="container-x relative py-20 lg:py-28">
+          <div className="max-w-3xl animate-fadeUp">
             <Badge tone="gold" className="mb-5">{t('home.badge')}</Badge>
             <h1 className="text-4xl font-bold leading-[1.25] sm:text-5xl lg:text-[3.4rem]">
               {t('home.heroTitle')} <span className="gold-text">{t('home.heroHighlight')}</span>
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-ink-secondary sm:text-lg">
+            <p className="mt-5 max-w-2xl text-base leading-8 text-ink-secondary sm:text-lg">
               {t('home.heroDesc')}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/register"><Button className="px-7 py-3 text-base">{t('home.ctaStart')}</Button></Link>
               <Link to="/courses"><Button variant="outline" className="px-7 py-3 text-base">{t('home.ctaExplore')}</Button></Link>
-            </div>
-          </div>
-          <div className="relative hidden animate-fadeUp lg:block" aria-hidden>
-            <div className="absolute -inset-8 rounded-full bg-gold-500/10 blur-3xl" />
-            <img src="/brand/identity-poster.jpg" alt="" className="relative rounded-lg border border-line-gold shadow-glow" />
-            <div className="absolute -bottom-5 -right-5 flex items-center gap-2 animate-float rounded-lg border border-line bg-surface-2/90 px-4 py-3 text-xs text-ink-secondary backdrop-blur">
-              <IconSecurity className="size-4 shrink-0 text-gold-300" />
-              <span>{t('home.trustBadge')}</span>
             </div>
           </div>
         </div>
