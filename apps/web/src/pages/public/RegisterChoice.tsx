@@ -80,9 +80,6 @@ export default function RegisterChoice() {
       <Card className="w-full max-w-lg p-6 sm:p-10 shadow-card">
         {/* رأس الصفحة مع أنيميشن متلاشي للأعلى */}
         <div className="text-center animate-fadeUp">
-          <div className="mx-auto mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-gold-500/10 text-gold-500 ring-1 ring-gold-500/20">
-            <span className="text-2xl font-black">س</span>
-          </div>
           <h1 className="text-2xl font-extrabold sm:text-3xl text-ink-primary">
             {t('oauth.welcomeTitle')}{' '}
             <span className="gold-text">{t('register.titleHighlight')}</span>
