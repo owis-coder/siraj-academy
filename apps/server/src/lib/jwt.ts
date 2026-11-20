@@ -60,3 +60,40 @@ export function verifyToken(token: string): TokenPayload | null {
 
 export const COOKIE_NAME = "sid";
 export const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 يومًا
+
+// ---------- تذكرة استكمال التسجيل الخارجي الموثوقة (OAuth Registration Ticket) ----------
+export interface OAuthTicketPayload {
+  ticketType: "oauth_registration";
+  provider: "google";
+  providerSubjectId: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+}
+
+export function signOAuthTicket(payload: Omit<OAuthTicketPayload, "ticketType">): string {
+  return jwt.sign(
+    { ...payload, ticketType: "oauth_registration" },
+    JWT_SECRET as string,
+    { expiresIn: "15m" },
+  );
+}
+
+export function verifyOAuthTicket(token: string): OAuthTicketPayload | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET as string);
+    if (
+      typeof decoded === "object" &&
+      decoded !== null &&
+      (decoded as { ticketType?: string }).ticketType === "oauth_registration" &&
+      (decoded as { provider?: string }).provider === "google" &&
+      Boolean((decoded as { providerSubjectId?: string }).providerSubjectId) &&
+      Boolean((decoded as { email?: string }).email)
+    ) {
+      return decoded as OAuthTicketPayload;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

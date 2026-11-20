@@ -464,13 +464,44 @@ export interface LiveSession {
 export interface PlatformPublic {
   name?: string;
   telegramLink?: string | null;
+  telegram_link?: string | null;
   whatsappNumbers?: string | string[] | null;
+  whatsapp_numbers?: string | string[] | null;
   paymentInstructions?: string | null;
+  payment_instructions_preview?: string | null;
   iban?: string | null;
   bankName?: string | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   faq?: any;
+  oauth?: {
+    googleEnabled: boolean;
+    googleClientId: string;
+  };
 }
+
+export type OAuthGoogleResponse = {
+  status: 'LOGGED_IN' | 'ACCOUNT_EXISTS' | 'NEEDS_COMPLETION';
+  user?: User;
+  session?: { id: string };
+  email?: string;
+  registrationTicket?: string;
+  fullName?: string;
+  avatarUrl?: string | null;
+};
+
+export type CompleteOAuthInput = {
+  registrationTicket: string;
+  fullName: string;
+  username: string;
+  password?: string;
+  confirmPassword?: string;
+  role: 'STUDENT' | 'TEACHER';
+  degree?: string;
+  bio?: string;
+  specialties?: string[];
+  universitiesText?: string;
+  docsUrl?: string;
+};
 
 export interface MfaPendingResponse {
   requireMfa: true;
@@ -580,6 +611,20 @@ export const api = {
         data: (payload && 'user' in payload ? payload.user : payload) as User,
       };
     },
+    google: (idToken: string) =>
+      request<OAuthGoogleResponse>('/auth/google', {
+        method: 'POST',
+        body: { idToken },
+      }),
+    completeOAuth: (body: CompleteOAuthInput) =>
+      request<{
+        user: User;
+        session?: { id: string };
+        status: 'ACTIVE' | 'PENDING';
+      }>('/auth/register/complete-oauth', {
+        method: 'POST',
+        body,
+      }),
     mfa: {
       verify: (body: { mfaTicket: string; code: string }) =>
         request<{ user: User; message: string }>('/auth/mfa/verify', { method: 'POST', body }),

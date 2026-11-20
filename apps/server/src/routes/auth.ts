@@ -2,7 +2,8 @@ import { Router } from "express";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { hashPassword, comparePassword } from "../lib/password";
-import { signToken, COOKIE_NAME, COOKIE_MAX_AGE, verifyToken } from "../lib/jwt";
+import { signToken, COOKIE_NAME, COOKIE_MAX_AGE, verifyToken, signOAuthTicket, verifyOAuthTicket } from "../lib/jwt";
+import { verifyGoogleIdToken } from "../lib/googleAuth";
 import { sendMail } from "../lib/mail";
 import { notifyAdmins } from "../lib/notify";
 import { sendAdminNotificationEmail } from "../lib/adminNotify";
@@ -26,6 +27,7 @@ import { securityCache } from "../lib/redis";
 import {
   studentRegisterSchema,
   teacherRegisterSchema,
+  completeOAuthSchema,
   loginSchema,
   verifyEmailSchema,
   forgotPasswordSchema,
@@ -426,6 +428,243 @@ router.post(
         user: sanitizeUser(user),
         teacherProfile: { id: profile.id, status: profile.status },
         message: "تم إنشاء حساب المدرس، وسيُفعّل بعد مراجعة الإدارة.",
+      },
+    });
+  }),
+);
+
+// ---------- المصادقة الموثوقة عبر Google Identity Services ----------
+router.post(
+  "/google",
+  asyncHandler(async (req, res) => {
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken || typeof idToken !== "string") {
+      throw badRequest("رمز هوية Google مطلوب.");
+    }
+
+    const verified = await verifyGoogleIdToken(idToken);
+
+    // 1) فحص ما إذا كانت هوية Google مسجلة ومرتبطة بحساب موجود مسبقًا
+    const existingOAuth = await prisma.oAuthAccount.findUnique({
+      where: {
+        provider_providerSubjectId: {
+          provider: "google",
+          providerSubjectId: verified.sub,
+        },
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (existingOAuth && existingOAuth.user) {
+      const user = existingOAuth.user;
+
+      if (user.status === "SUSPENDED") {
+        throw forbidden("الحساب موقوف. يرجى التواصل مع الإدارة.");
+      }
+
+      // تحديث وقت آخر استخدام للهوية
+      await prisma.oAuthAccount.update({
+        where: { id: existingOAuth.id },
+        data: { lastUsedAt: new Date(), email: verified.email },
+      });
+
+      const session = await startSession(req, res, user);
+
+      await audit({
+        req,
+        userId: user.id,
+        action: "LOGIN",
+        category: "AUTH",
+        result: "SUCCESS",
+        newValues: { method: "GOOGLE_OAUTH", providerSubjectId: verified.sub },
+      });
+
+      return res.json({
+        data: {
+          status: "LOGGED_IN",
+          user: sanitizeUser(user),
+          session: { id: session.id },
+        },
+        message: "تم تسجيل الدخول بنجاح عبر حساب Google.",
+      });
+    }
+
+    // 2) إذا لم تكن الهوية مربوطة: هل يوجد مستخدم مسجل مسبقًا بهذا البريد؟
+    const existingUserByEmail = await prisma.user.findUnique({
+      where: { email: verified.email },
+    });
+
+    if (existingUserByEmail) {
+      await audit({
+        req,
+        action: "LOGIN",
+        category: "AUTH",
+        result: "FAILURE",
+        reason: "محاولة دخول بـ Google لبريد موجود مسبقًا غير مربوط",
+        newValues: { email: verified.email, provider: "google" },
+      });
+
+      return res.status(200).json({
+        data: {
+          status: "ACCOUNT_EXISTS",
+          email: verified.email,
+        },
+        message:
+          "يوجد حساب مسجل بهذا البريد مسبقًا. يرجى تسجيل الدخول أولاً بكلمة المرور الخاصة بك لإتمام ربط حساب Google بأمان.",
+      });
+    }
+
+    // 3) مستخدم جديد تمامًا — نصدر تذكرة تسجيل مؤقتة موقّعة ومحمية من التلاعب
+    const registrationTicket = signOAuthTicket({
+      provider: "google",
+      providerSubjectId: verified.sub,
+      email: verified.email,
+      name: verified.name,
+      avatarUrl: verified.picture,
+    });
+
+    await audit({
+      req,
+      action: "REGISTER",
+      category: "AUTH",
+      result: "SUCCESS",
+      reason: "تم التحقق من هوية Google وبانتظار استكمال البيانات",
+      newValues: { email: verified.email, provider: "google" },
+    });
+
+    return res.status(200).json({
+      data: {
+        status: "NEEDS_COMPLETION",
+        registrationTicket,
+        email: verified.email,
+        fullName: verified.name || "",
+        avatarUrl: verified.picture || null,
+      },
+      message: "تم التحقق من حساب Google بنجاح. يرجى استكمال بيانات التسجيل.",
+    });
+  }),
+);
+
+// ---------- استكمال بيانات التسجيل لحسابات OAuth (Google) ----------
+router.post(
+  "/register/complete-oauth",
+  requireCaptcha("REGISTER"),
+  parseBody(completeOAuthSchema),
+  asyncHandler(async (req, res) => {
+    const data = req.body;
+
+    // 1) فحص التذكرة الموقّعة واستخراج البريد والهوية الموثقة منها حصرًا (Zero-Trust)
+    const ticket = verifyOAuthTicket(data.registrationTicket);
+    if (!ticket) {
+      throw unauthorized("تذكرة التسجيل منتهية الصلاحية أو غير صالحة. يرجى إعادة تسجيل الدخول عبر Google.");
+    }
+
+    const verifiedEmail = ticket.email.toLowerCase().trim();
+
+    // 2) التأكد من عدم استخدام اسم المستخدم أو البريد مسبقًا
+    try {
+      await assertFreeCredentials(data.username, verifiedEmail);
+    } catch (err) {
+      await audit({
+        req,
+        action: "REGISTER",
+        category: "AUTH",
+        result: "FAILURE",
+        reason: (err as Error).message,
+        newValues: { username: data.username, provider: ticket.provider },
+      });
+      throw err;
+    }
+
+    const isTeacher = data.role === "TEACHER";
+    let user;
+
+    try {
+      user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            fullName: data.fullName.trim(),
+            username: data.username.trim(),
+            email: verifiedEmail, // البريد الموثق من تذكرة Google المشفرة
+            passwordHash: await hashPassword(data.password),
+            whatsapp: data.whatsapp ?? null,
+            role: isTeacher ? Role.TEACHER : Role.STUDENT,
+            status: isTeacher ? "PENDING" : "ACTIVE",
+            emailVerified: true, // موثق رسميًا من Google
+            emailVerifiedAt: new Date(),
+            universityId: data.universityId || null,
+            majorId: data.majorId || null,
+            level: data.level?.trim() || null,
+          },
+        });
+
+        // ربط هوية OAuth
+        await tx.oAuthAccount.create({
+          data: {
+            userId: newUser.id,
+            provider: ticket.provider,
+            providerSubjectId: ticket.providerSubjectId,
+            email: verifiedEmail,
+          },
+        });
+
+        if (isTeacher) {
+          await tx.teacherProfile.create({
+            data: {
+              userId: newUser.id,
+              degree: data.degree || "بكالوريوس",
+              bio: data.bio || `مدرس مسجل عبر ${ticket.provider}`,
+              specialties: data.specialties && data.specialties.length > 0 ? data.specialties : ["عام"],
+              status: "PENDING",
+            },
+          });
+        }
+
+        return newUser;
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw conflict("اسم المستخدم أو البريد الإلكتروني مستخدم مسبقًا.");
+      }
+      throw err;
+    }
+
+    triggerUsersExcelSync();
+
+    await audit({
+      req,
+      userId: user.id,
+      action: "REGISTER",
+      category: "AUTH",
+      result: "SUCCESS",
+      newValues: { method: "GOOGLE_OAUTH", providerSubjectId: ticket.providerSubjectId },
+    });
+
+    if (isTeacher) {
+      await notifyAdmins({
+        title: "مدرس جديد بانتظار المراجعة (Google)",
+        body: `${user.fullName} سجل عبر Google وبانتظار المراجعة.`,
+        link: "/admin/teachers?status=PENDING",
+        type: "TEACHER_PENDING",
+      });
+
+      return res.status(201).json({
+        data: {
+          user: sanitizeUser(user),
+          message: "تم إنشاء حساب المدرس بنجاح عبر Google، وسيتم تفعيله بعد مراجعة الإدارة.",
+        },
+      });
+    }
+
+    // الطالب: نسجل دخوله فورًا
+    await startSession(req, res, user);
+
+    return res.status(201).json({
+      data: {
+        user: sanitizeUser(user),
+        message: "تم إنشاء حسابك وتوثيقه بنجاح عبر Google.",
       },
     });
   }),

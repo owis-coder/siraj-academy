@@ -133,5 +133,47 @@ export const resetPasswordSchema = z
   })
   .superRefine(confirmPasswordRule);
 
+/* ===================== استكمال تسجيل Google OAuth ===================== */
+export const completeOAuthSchema = z
+  .object({
+    registrationTicket: z.string().min(20, "تذكرة التسجيل مفقودة أو غير صالحة"),
+    fullName: fullNameRule,
+    username: usernameRule,
+    password: passwordRule,
+    confirmPassword: z.string().min(1, "أكّد كلمة المرور"),
+    role: z.enum(["STUDENT", "TEACHER"]).default("STUDENT"),
+    whatsapp: phoneRule.optional(),
+    universityId: z.string().min(1).optional(),
+    majorId: z.string().min(1).optional(),
+    level: z.string().trim().max(100).optional(),
+    degree: z.string().trim().max(120).optional(),
+    bio: z.string().trim().max(2000).optional(),
+    specialties: z
+      .preprocess(
+        (val) => (typeof val === "string" ? val.split(/[,،\n]+/).map((s) => s.trim()).filter(Boolean) : val),
+        z.array(z.string().trim().min(2).max(80)).optional(),
+      ),
+    captchaToken: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "تأكيد كلمة المرور غير مطابق لكلمة المرور",
+      });
+    }
+    if (data.role === "TEACHER") {
+      if (!data.degree || data.degree.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["degree"],
+          message: "المؤهل العلمي مطلوب لتسجيل حساب مدرّس",
+        });
+      }
+    }
+  });
+
+export type CompleteOAuthInput = z.infer<typeof completeOAuthSchema>;
 export type StudentRegisterInput = z.infer<typeof studentRegisterSchema>;
 export type TeacherRegisterInput = z.infer<typeof teacherRegisterSchema>;

@@ -7,6 +7,7 @@ import { Button, Card, Form, Field, Input, PasswordInput } from '../../component
 import { useI18n } from '../../i18n';
 import { IconShieldKeyhole } from '../../components/icons';
 import { Recaptcha, type RecaptchaRef } from '../../components/Recaptcha';
+import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 
 export default function Login() {
   const nav = useNavigate();
@@ -14,7 +15,8 @@ export default function Login() {
   const toast = useToast();
   const { refresh } = useAuth();
   const { t } = useI18n();
-  const [identifier, setIdentifier] = useState('');
+  const stateIdentifier = (loc.state as { identifier?: string } | null)?.identifier ?? '';
+  const [identifier, setIdentifier] = useState(stateIdentifier);
   const [password, setPassword] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
@@ -23,6 +25,50 @@ export default function Login() {
   const [mfaCode, setMfaCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const handleGoogleSuccess = async (idToken: string) => {
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await api.auth.google(idToken);
+      const data = res.data;
+
+      if (data.status === 'LOGGED_IN') {
+        await refresh();
+        toast.push('success', t('login.success'));
+        navigateAfterLogin(data.user);
+        return;
+      }
+
+      if (data.status === 'ACCOUNT_EXISTS') {
+        setIdentifier(data.email || '');
+        setErr(
+          t('oauth.existingAccountLogin') ||
+            'يوجد حساب مسجل بهذا البريد مسبقًا. يرجى تسجيل الدخول بكلمة المرور الخاصة بك لإتمام ربط حساب Google بأمان.'
+        );
+        return;
+      }
+
+      if (data.status === 'NEEDS_COMPLETION') {
+        const payload = {
+          registrationTicket: data.registrationTicket,
+          email: data.email,
+          fullName: data.fullName,
+          avatarUrl: data.avatarUrl,
+        };
+        try {
+          sessionStorage.setItem('siraj_oauth_registration', JSON.stringify(payload));
+        } catch {
+          /* تجاهل */
+        }
+        nav('/register/complete', { state: payload });
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'تعذر تسجيل الدخول عبر Google.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const from = (loc.state as { from?: string } | null)?.from ?? null;
 
@@ -142,6 +188,22 @@ export default function Login() {
       <Card className="w-full p-8">
         <h1 className="mb-1 text-2xl font-bold">{t('login.title')}</h1>
         <p className="mb-6 text-sm text-ink-muted">{t('login.subtitle')}</p>
+
+        <div className="mb-5">
+          <GoogleSignInButton
+            text="signin_with"
+            disabled={busy}
+            onSuccess={handleGoogleSuccess}
+            onError={(e) => setErr(e.message)}
+          />
+          <div className="relative my-4 flex items-center justify-center">
+            <div className="w-full border-t border-line" />
+            <span className="absolute bg-surface px-3 text-xs font-medium text-ink-muted">
+              {t('oauth.or')}
+            </span>
+          </div>
+        </div>
+
         <Form onSubmit={submit} className="space-y-4">
           <Field label={t('login.identifier')} required>
             <Input

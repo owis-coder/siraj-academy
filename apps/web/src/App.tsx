@@ -22,6 +22,8 @@ import Teachers from './pages/public/Teachers';
 import TeacherProfilePage from './pages/public/TeacherProfilePage';
 import Login from './pages/public/Login';
 import Register from './pages/public/Register';
+import RegisterChoice from './pages/public/RegisterChoice';
+import RegisterComplete from './pages/public/RegisterComplete';
 import VerifyEmail from './pages/public/VerifyEmail';
 import ForgotPassword from './pages/public/ForgotPassword';
 import ResetPassword from './pages/public/ResetPassword';
@@ -130,7 +132,10 @@ export default function App() {
               <Route path="teachers" element={<Teachers />} />
               <Route path="teachers/:username" element={<TeacherProfilePage />} />
               <Route path="login" element={<Login />} />
-              <Route path="register" element={<Register />} />
+              <Route path="register" element={<RegisterChoice />} />
+              <Route path="register/form" element={<Register />} />
+              <Route path="register/email" element={<Register />} />
+              <Route path="register/complete" element={<RegisterComplete />} />
               <Route path="verify-email" element={<VerifyEmail />} />
               <Route path="forgot-password" element={<ForgotPassword />} />
               <Route path="reset-password" element={<ResetPassword />} />

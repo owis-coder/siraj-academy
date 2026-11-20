@@ -204,6 +204,7 @@ model User {
   blockedBy        Block[]          @relation("BlockTarget")
   blocking         Block[]          @relation("BlockOwner")
   sessions         UserSession[]
+  oauthAccounts    OAuthAccount[]
   authTokens       AuthToken[]
   auditLogs        AuditLog[]
 
@@ -245,6 +246,24 @@ model UserSession {
 
   @@index([userId])
   @@index([lastSeenAt])
+}
+
+// ---------- هويات المصادقة الخارجية (Google OAuth) ----------
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String   // "google", etc.
+  providerSubjectId String   // معرّف sub الصادر من المزود
+  email             String?  // البريد الموثق من المزود
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastUsedAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubjectId])
+  @@index([userId])
+  @@index([provider, email])
 }
 
 // ---------- سجل التدقيق الشامل ----------

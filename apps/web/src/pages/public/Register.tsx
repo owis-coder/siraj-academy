@@ -298,6 +298,15 @@ export default function Register() {
 
   return (
     <div className="container-x max-w-xl py-12">
+      <div className="mb-4 text-center">
+        <Link
+          to="/register"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-gold-500 transition-colors"
+        >
+          <span>←</span>
+          <span>{t('oauth.backToChoice') || 'العودة لاختيار طريقة أخرى'}</span>
+        </Link>
+      </div>
       <h1 className="mb-2 text-center text-3xl font-bold">
         {t('register.title')} <span className="gold-text">{t('register.titleHighlight')}</span>
       </h1>

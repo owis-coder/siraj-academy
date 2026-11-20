@@ -62,6 +62,10 @@ async function platformInfoHandler(_req: unknown, res: import("express").Respons
         siteKey: process.env.RECAPTCHA_SITE_KEY || "",
         mode: (await getSecuritySettings()).recaptchaMode || "v2",
       },
+      oauth: {
+        googleEnabled: Boolean(process.env.GOOGLE_CLIENT_ID),
+        googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+      },
     },
   });
 }
