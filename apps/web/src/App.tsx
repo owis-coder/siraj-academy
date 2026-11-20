@@ -31,6 +31,7 @@ import AdminAudit from './pages/dashboard/admin/AdminAudit';
 import AdminSecurity from './pages/dashboard/admin/AdminSecurity';
 import About from './pages/public/About';
 import Faq from './pages/public/Faq';
+import PrivacyPolicy from './pages/public/PrivacyPolicy';
 import NotFound from './pages/NotFound';
 
 import { DashboardHome, Orders, OrderDetail } from './pages/dashboard/student/StudentPages';
@@ -160,6 +161,7 @@ export default function App() {
               />
               <Route path="about" element={<About />} />
               <Route path="faq" element={<Faq />} />
+              <Route path="privacy" element={<PrivacyPolicy />} />
               <Route path="*" element={<NotFound />} />
             </Route>
 

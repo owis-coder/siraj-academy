@@ -70,6 +70,9 @@ export function Footer() {
       <div className="border-t border-line/70">
         <div className="container-x flex flex-wrap items-center justify-between gap-2 py-4 text-xs text-ink-muted">
           <span>© {new Date().getFullYear()} {t('footer.rights')}</span>
+          <Link to="/privacy" className="font-medium text-ink-secondary transition-colors hover:text-gold-200">
+            سياسة الخصوصية
+          </Link>
           <span dir="ltr">WO549604202 · 0579769007</span>
         </div>
       </div>
