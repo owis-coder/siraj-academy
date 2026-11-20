@@ -33,6 +33,8 @@ import AdminSecurity from './pages/dashboard/admin/AdminSecurity';
 import About from './pages/public/About';
 import Faq from './pages/public/Faq';
 import PrivacyPolicy from './pages/public/PrivacyPolicy';
+import TermsOfUse from './pages/public/TermsOfUse';
+import RefundPolicy from './pages/public/RefundPolicy';
 import NotFound from './pages/NotFound';
 
 import { DashboardHome, Orders, OrderDetail } from './pages/dashboard/student/StudentPages';
@@ -163,9 +165,9 @@ export default function App() {
               />
               <Route path="about" element={<About />} />
               <Route path="faq" element={<Faq />} />
-              <Route path="privacy" element={<PrivacyPolicy defaultTab="privacy" />} />
-              <Route path="terms" element={<PrivacyPolicy defaultTab="terms" />} />
-              <Route path="refund" element={<PrivacyPolicy defaultTab="refund" />} />
+              <Route path="privacy" element={<PrivacyPolicy />} />
+              <Route path="terms" element={<TermsOfUse />} />
+              <Route path="refund" element={<RefundPolicy />} />
               <Route path="*" element={<NotFound />} />
             </Route>
 
