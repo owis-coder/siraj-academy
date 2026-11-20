@@ -76,6 +76,7 @@ const baseRegisterObject = z.object({
   universityId: z.string().min(1).optional(),
   majorId: z.string().min(1).optional(),
   level: z.string().trim().max(100).optional(),
+  captchaToken: z.string().optional(),
 });
 
 const confirmPasswordRule = <T extends { password: string; confirmPassword: string }>(
@@ -110,6 +111,7 @@ export const teacherRegisterSchema = baseRegisterObject
 export const loginSchema = z.object({
   identifier: z.string().trim().min(3, "أدخل البريد أو اسم المستخدم"),
   password: z.string().min(1, "أدخل كلمة المرور"),
+  captchaToken: z.string().optional(),
 });
 
 export const verifyEmailSchema = z.object({
@@ -120,6 +122,7 @@ export const verifyEmailSchema = z.object({
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email("أدخل بريدًا إلكترونيًا صحيحًا"),
+  captchaToken: z.string().optional(),
 });
 
 export const resetPasswordSchema = z

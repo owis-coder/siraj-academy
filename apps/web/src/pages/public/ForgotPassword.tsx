@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { Button, Card, Field, Form, Input } from '../../components/ui';
 import { EMAIL_RE } from '../../lib/accountRules';
 import { useI18n } from '../../i18n';
+import { Recaptcha, type RecaptchaRef } from '../../components/Recaptcha';
 
 export default function ForgotPassword() {
   const { t } = useI18n();
   const [email, setEmail] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
+  const recaptchaRef = useRef<RecaptchaRef>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -17,12 +21,18 @@ export default function ForgotPassword() {
       setErr(t('validation.emailInvalid'));
       return;
     }
+    if (captchaEnabled && !captchaToken) {
+      setErr(t('captcha.required'));
+      return;
+    }
     setErr(null);
     setBusy(true);
     try {
-      const { data } = await api.auth.forgotPassword(email.trim());
+      const { data } = await api.auth.forgotPassword(email.trim(), captchaToken);
       setDone(data?.message ?? t('forgot.subtitle'));
     } catch (e) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
       setErr(e instanceof Error ? e.message : t('forgot.failed'));
     } finally {
       setBusy(false);
@@ -48,6 +58,15 @@ export default function ForgotPassword() {
             <Field label={t('common.email')} required error={err ?? undefined}>
               <Input dir="ltr" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </Field>
+            <Recaptcha
+              ref={recaptchaRef}
+              onVerify={(token) => {
+                setCaptchaToken(token);
+                setErr(null);
+              }}
+              onExpired={() => setCaptchaToken(null)}
+              onReady={setCaptchaEnabled}
+            />
             <Button type="submit" loading={busy} className="w-full">{t('forgot.send')}</Button>
             <p className="text-center text-sm text-ink-muted">
               {t('forgot.remembered')} <Link to="/login" className="text-gold-300 hover:text-gold-200">{t('register.signIn')}</Link>

@@ -21,6 +21,7 @@ import { passwordService } from "../lib/passwordSecurity";
 import { securityMonitor } from "../lib/securityMonitor";
 import { getTrustedClientIp } from "../lib/ipShield";
 import { requireCaptcha } from "../middleware/captcha";
+import { getSecuritySettings } from "../lib/securitySettings";
 import { securityCache } from "../lib/redis";
 import {
   studentRegisterSchema,
@@ -803,6 +804,23 @@ router.get(
     // لا نعيد كلمة المرور المشفرة ولا توكن التحقق
     const { passwordHash: _p, emailVerificationToken: _t, ...safeUser } = user;
     res.json({ data: { user: safeUser } });
+  }),
+);
+
+// ---------- إعدادات التحقق البشري العامة (Google reCAPTCHA Config) ----------
+router.get(
+  "/captcha-config",
+  asyncHandler(async (_req, res) => {
+    const isProduction = process.env.NODE_ENV === "production";
+    const secSettings = await getSecuritySettings();
+    const siteKey = process.env.RECAPTCHA_SITE_KEY || "";
+    res.json({
+      data: {
+        enabled: isProduction || secSettings.recaptchaEnabled,
+        siteKey,
+        mode: secSettings.recaptchaMode || "v2",
+      },
+    });
   }),
 );
 

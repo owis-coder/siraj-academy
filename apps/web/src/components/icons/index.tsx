@@ -58,6 +58,8 @@ import {
   RiPresentationLine,
   RiCodeSSlashLine,
   RiSearchEyeLine,
+  RiEyeLine,
+  RiEyeOffLine,
   RiQuillPenLine,
   RiRuler2Line,
   RiBook2Line,
@@ -109,6 +111,8 @@ export const IconSecurity = (props: RemixIconProps) => <RiShieldCheckLine {...pr
 export const IconAudit = (props: RemixIconProps) => <RiHistoryLine {...props} />;
 
 /* أيقونات الإجراءات والنماذج */
+export const IconEye = (props: RemixIconProps) => <RiEyeLine {...props} />;
+export const IconEyeOff = (props: RemixIconProps) => <RiEyeOffLine {...props} />;
 export const IconSearch = (props: RemixIconProps) => <RiSearchLine {...props} />;
 export const IconClose = (props: RemixIconProps) => <RiCloseLine {...props} />;
 export const IconAdd = (props: RemixIconProps) => <RiAddLine {...props} />;

@@ -10,7 +10,7 @@ export interface SecuritySettings {
   emergencyMode: boolean;
   rateLimitEnabled: boolean;
   recaptchaEnabled: boolean;
-  recaptchaMode: "v3" | "enterprise" | "simulated";
+  recaptchaMode: "v2" | "v3" | "enterprise" | "simulated";
   recaptchaMinScore: number;
   autoBanEnabled: boolean;
   banDurationMinutes: number;

@@ -45,6 +45,7 @@ type Options = {
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
   formData?: FormData;
+  headers?: Record<string, string>;
 };
 
 function qs(query?: Options['query']) {
@@ -58,7 +59,7 @@ function qs(query?: Options['query']) {
 }
 
 export async function request<T>(path: string, opts: Options = {}): Promise<{ data: T; meta?: Meta }> {
-  const { method = 'GET', body, query, formData } = opts;
+  const { method = 'GET', body, query, formData, headers } = opts;
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}${qs(query)}`, {
@@ -67,6 +68,7 @@ export async function request<T>(path: string, opts: Options = {}): Promise<{ da
       headers: {
         'Accept-Language': currentLang(),
         ...(formData ? {} : body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...headers,
       },
       body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
@@ -528,7 +530,7 @@ export interface SecuritySettingsData {
   rateLimitEnabled: boolean;
   recaptchaEnabled: boolean;
   recaptchaMinScore: number;
-  recaptchaMode: 'v3' | 'enterprise' | 'simulated';
+  recaptchaMode: 'v2' | 'v3' | 'enterprise' | 'simulated';
   autoBanEnabled: boolean;
   banDurationMinutes: number;
   failedLoginThreshold: number;
@@ -538,13 +540,33 @@ export interface SecuritySettingsData {
 
 export const api = {
   auth: {
-    registerStudent: (body: Record<string, unknown>) => request<{ message?: string }>('/auth/register/student', { method: 'POST', body }),
-    registerTeacher: (body: Record<string, unknown>) => request<{ message?: string }>('/auth/register/teacher', { method: 'POST', body }),
+    captchaConfig: () => request<{ enabled: boolean; siteKey: string; mode: string }>('/auth/captcha-config'),
+    registerStudent: (body: Record<string, unknown>, captchaToken?: string | null) => {
+      const headers: Record<string, string> = {};
+      if (captchaToken) headers['x-captcha-token'] = captchaToken;
+      return request<{ message?: string }>('/auth/register/student', {
+        method: 'POST',
+        body: captchaToken ? { ...body, captchaToken } : body,
+        headers,
+      });
+    },
+    registerTeacher: (body: Record<string, unknown>, captchaToken?: string | null) => {
+      const headers: Record<string, string> = {};
+      if (captchaToken) headers['x-captcha-token'] = captchaToken;
+      return request<{ message?: string }>('/auth/register/teacher', {
+        method: 'POST',
+        body: captchaToken ? { ...body, captchaToken } : body,
+        headers,
+      });
+    },
     // الخادم يغلّف المستخدم داخل { user }؛ نُعيد هنا كائن المستخدم أو تذكرة MFA إن كانت مفعلة
-    login: async (identifier: string, password: string) => {
+    login: async (identifier: string, password: string, captchaToken?: string | null) => {
+      const headers: Record<string, string> = {};
+      if (captchaToken) headers['x-captcha-token'] = captchaToken;
       const res = await request<User | { user?: User; requireMfa?: boolean; mfaTicket?: string; message?: string }>('/auth/login', {
         method: 'POST',
-        body: { identifier, password },
+        body: { identifier, password, ...(captchaToken ? { captchaToken } : {}) },
+        headers,
       });
       const payload = res.data as { user?: User; requireMfa?: boolean; mfaTicket?: string; message?: string } | User | null;
       if (payload && 'requireMfa' in payload && payload.requireMfa) {
@@ -586,8 +608,15 @@ export const api = {
         '/auth/username-availability',
         { query: { username } },
       ),
-    forgotPassword: (email: string) =>
-      request<{ message: string }>('/auth/forgot-password', { method: 'POST', body: { email } }),
+    forgotPassword: (email: string, captchaToken?: string | null) => {
+      const headers: Record<string, string> = {};
+      if (captchaToken) headers['x-captcha-token'] = captchaToken;
+      return request<{ message: string }>('/auth/forgot-password', {
+        method: 'POST',
+        body: { email, ...(captchaToken ? { captchaToken } : {}) },
+        headers,
+      });
+    },
     resetPassword: (body: { token: string; password: string; confirmPassword: string }) =>
       request<{ message: string }>('/auth/reset-password', { method: 'POST', body }),
     confirmEmailChange: (token: string) =>

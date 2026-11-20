@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getSettings, getWhatsappNumbers } from "../lib/settings";
+import { getSecuritySettings } from "../lib/securitySettings";
 import { asyncHandler } from "../middleware/errorHandler";
 
 const router = Router();
@@ -56,6 +57,11 @@ async function platformInfoHandler(_req: unknown, res: import("express").Respons
         ? categories
         : Object.entries(SERVICE_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
       faq,
+      recaptcha: {
+        enabled: process.env.NODE_ENV === "production" || (await getSecuritySettings()).recaptchaEnabled,
+        siteKey: process.env.RECAPTCHA_SITE_KEY || "",
+        mode: (await getSecuritySettings()).recaptchaMode || "v2",
+      },
     },
   });
 }

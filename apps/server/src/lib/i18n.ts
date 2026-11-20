@@ -26,6 +26,14 @@ const EN: Record<string, string> = {
   "أرفق صورة في الحقل avatar": "Please attach an image in the avatar field.",
   "الجلسة غير موجودة": "Session not found.",
   "غير مصرح": "Not authorized.",
+  "رمز التحقق البشري (reCAPTCHA) إلزامي لإتمام هذا الطلب.": "Human verification (reCAPTCHA) is required to complete this request.",
+  "فشل التحقق الأمني من الرمز. يُرجى إعادة المحاولة.": "Security verification failed. Please try again.",
+  "رمز التحقق البشري مفقود أو غير صالح": "Human verification token is missing or invalid.",
+  "رمز التحقق استُخدم مسبقًا ولا يمكن إعادة استخدامه.": "Verification token was already used and cannot be reused.",
+  "تم تصنيف هذا الطلب كنشاط آلي أو عالي المخاطر.": "This request was classified as automated or high-risk activity.",
+  "إجراء رمز التحقق لا يطابق العملية المطلوبة.": "Verification token action does not match the requested operation.",
+  "نطاق رمز التحقق لا يطابق نطاق المنصة المعتمد.": "Verification token domain does not match the approved platform domain.",
+  "تعذر التحقق من خوادم الحماية. أعد المحاولة لاحقًا (Fail-Closed Enforcement).": "Security servers could not be reached. Please try again later.",
 
   // ---------- التحقق ----------
   "الاسم الكامل يجب أن يكون 3 أحرف على الأقل": "Full name must be at least 3 characters.",

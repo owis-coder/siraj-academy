@@ -1,6 +1,6 @@
 import { useState, type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type FormEvent } from 'react';
 import { useI18n } from '../i18n';
-import { IconClose, IconChevronDown, IconCheck, IconFolder } from './icons';
+import { IconClose, IconChevronDown, IconCheck, IconFolder, IconEye, IconEyeOff } from './icons';
 
 /* ============ Button ============ */
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -89,6 +89,31 @@ export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInput
   return <input className={`input-base ${className}`} {...rest} />;
 }
 
+export function PasswordInput({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+  const [visible, setVisible] = useState(false);
+  const { t } = useI18n();
+
+  return (
+    <div className="relative w-full">
+      <input
+        type={visible ? 'text' : 'password'}
+        className={`input-base pe-11 ${className}`}
+        {...rest}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? t('common.hidePassword') : t('common.showPassword')}
+        title={visible ? t('common.hidePassword') : t('common.showPassword')}
+        className="absolute inset-y-0 end-0 flex items-center pe-3 text-ink-muted hover:text-ink-secondary focus:outline-none transition-colors"
+      >
+        {visible ? <IconEyeOff className="size-4" /> : <IconEye className="size-4" />}
+      </button>
+    </div>
+  );
+}
+
 export function Select({ className = '', children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select className={`input-base ${className}`} {...rest}>
@@ -102,7 +127,19 @@ export function Textarea({ className = '', ...rest }: TextareaHTMLAttributes<HTM
 }
 
 /* ============ Tabs ============ */
-export function Tabs({ tabs, active, onChange, className = '' }: { tabs: { key: string; label: string; count?: number }[]; active: string; onChange: (k: string) => void; className?: string }) {
+export function Tabs({
+  tabs,
+  active,
+  onChange,
+  className = '',
+  fullWidth = false,
+}: {
+  tabs: { key: string; label: string; count?: number }[];
+  active: string;
+  onChange: (k: string) => void;
+  className?: string;
+  fullWidth?: boolean;
+}) {
   return (
     <div className={`flex flex-wrap gap-1 rounded-lg border border-line bg-surface/80 p-1 ${className}`} role="tablist">
       {tabs.map((t) => (
@@ -112,6 +149,8 @@ export function Tabs({ tabs, active, onChange, className = '' }: { tabs: { key: 
           aria-selected={active === t.key}
           onClick={() => onChange(t.key)}
           className={`rounded-[8px] px-4 py-2 text-sm font-medium transition-colors ${
+            fullWidth ? 'flex-1 text-center justify-center' : ''
+          } ${
             active === t.key ? 'bg-elevated text-gold-200 shadow-glow' : 'text-ink-muted hover:text-ink-secondary'
           }`}
         >

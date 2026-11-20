@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Button, Card, Field, Form, Input } from '../../components/ui';
+import { Button, Card, Field, Form, Input, PasswordInput } from '../../components/ui';
 import { isPasswordValid, passwordChecks } from '../../lib/accountRules';
 import { useI18n } from '../../i18n';
 import { IconCheck } from '../../components/icons';
@@ -62,10 +62,10 @@ export default function ResetPassword() {
             <p className="mb-6 mt-2 text-sm text-ink-muted">{t('reset.hint')}</p>
             <Form onSubmit={submit} className="space-y-4">
               <Field label={t('common.newPassword')} required>
-                <Input dir="ltr" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <PasswordInput autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
               </Field>
               <Field label={t('common.confirmPassword')} required error={err ?? undefined}>
-                <Input dir="ltr" type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                <PasswordInput autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </Field>
               <ul className="grid gap-1 text-xs">
                 {checks.map((c) => (

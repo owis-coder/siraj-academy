@@ -3,8 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { Button, Card, Form, Field, Input, Textarea, Tabs } from '../../components/ui';
+import { Button, Card, Form, Field, Input, PasswordInput, Textarea, Tabs } from '../../components/ui';
 import { IconCheck, IconClose } from '../../components/icons';
+import { Recaptcha, type RecaptchaRef } from '../../components/Recaptcha';
 import {
   EMAIL_RE,
   fullNameError,
@@ -50,6 +51,9 @@ export default function Register() {
 
   const [busy, setBusy] = useState(false);
   const [errs, setErrs] = useState<string[]>([]);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
+  const recaptchaRef = useRef<RecaptchaRef>(null);
 
   useEffect(() => {
     const value = username.trim();
@@ -119,6 +123,7 @@ export default function Register() {
     const e = validateCommon();
     if (unameStatus === 'checking') e.push(t('register.checkingWait'));
     if (unameStatus !== 'available') e.push(t('register.usernameRequired'));
+    if (captchaEnabled && !captchaToken) e.push(t('captcha.required'));
     setErrs(e);
     if (e.length) return;
     setBusy(true);
@@ -129,11 +134,13 @@ export default function Register() {
         email: email.trim(),
         password,
         confirmPassword,
-      });
+      }, captchaToken);
       await refresh();
       toast.push('success', t('register.successStudent'));
       nav('/dashboard');
     } catch (err) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
       setErrs([err instanceof Error ? err.message : t('register.failed')]);
     } finally {
       setBusy(false);
@@ -147,6 +154,7 @@ export default function Register() {
     if (bio.trim().length < 20) e.push(t('validation.bioMin'));
     if (unameStatus === 'checking') e.push(t('register.checkingWait'));
     if (unameStatus !== 'available') e.push(t('register.usernameRequired'));
+    if (captchaEnabled && !captchaToken) e.push(t('captcha.required'));
     setErrs(e);
     if (e.length) return;
     setBusy(true);
@@ -162,11 +170,13 @@ export default function Register() {
         specialties: specs,
         bio: bio.trim(),
         ...(docsUrl ? { docsUrl } : {}),
-      });
+      }, captchaToken);
       await refresh();
       toast.push('success', t('register.successTeacher'));
       nav('/teacher/profile');
     } catch (err) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
       setErrs([err instanceof Error ? err.message : t('register.failedTeacher')]);
     } finally {
       setBusy(false);
@@ -201,19 +211,18 @@ export default function Register() {
             </span>
             <div className="relative">
               <Input
-                dir="ltr"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
                 autoComplete="username"
-                placeholder="siraj_student"
+                placeholder={t('register.usernamePlaceholder')}
                 aria-invalid={unameInvalid}
                 aria-describedby="username-status"
-                className={`pe-11 ${unameInvalid ? 'border-danger/70' : unameStatus === 'available' ? 'border-ok/70' : ''}`}
+                className={`pe-11 text-start ${unameInvalid ? 'border-danger/70' : unameStatus === 'available' ? 'border-ok/70' : ''}`}
               />
               {(unameStatus === 'available' || unameStatus === 'taken' || unameStatus === 'invalid' || unameStatus === 'checking' || unameStatus === 'error') && (
                 <span
                   aria-hidden
-                  className={`pointer-events-none absolute end-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full border text-xs font-bold ${
+                  className={`pointer-events-none absolute end-2.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full border text-xs font-bold ${
                     unameStatus === 'available'
                       ? 'border-ok/60 bg-ok/15 text-emerald-700 dark:text-emerald-300'
                       : unameStatus === 'checking'
@@ -258,12 +267,14 @@ export default function Register() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('common.password')} required hint={t('register.passwordHint')}>
-          <Input dir="ltr" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+          />
         </Field>
         <Field label={t('common.confirmPassword')} required>
-          <Input
-            dir="ltr"
-            type="password"
+          <PasswordInput
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
@@ -298,12 +309,22 @@ export default function Register() {
         ]}
         active={tab}
         onChange={setTab}
+        fullWidth
         className="mx-auto mb-6 max-w-xs"
       />
       <Card className="p-8">
         {tab === 'student' ? (
           <Form onSubmit={submitStudent} className="space-y-4">
             {commonFields}
+            <Recaptcha
+              ref={recaptchaRef}
+              onVerify={(tok) => {
+                setCaptchaToken(tok);
+                setErrs((prev) => prev.filter((msg) => msg !== t('captcha.required')));
+              }}
+              onExpired={() => setCaptchaToken(null)}
+              onReady={setCaptchaEnabled}
+            />
             <Errors errs={errs} />
             <Button type="submit" loading={busy} className="w-full">{t('register.submitStudent')}</Button>
           </Form>
@@ -327,6 +348,15 @@ export default function Register() {
             <p className="rounded-md border border-line bg-elevated/50 p-3 text-xs leading-6 text-ink-muted">
               {t('register.teacherPendingNote')}
             </p>
+            <Recaptcha
+              ref={recaptchaRef}
+              onVerify={(tok) => {
+                setCaptchaToken(tok);
+                setErrs((prev) => prev.filter((msg) => msg !== t('captcha.required')));
+              }}
+              onExpired={() => setCaptchaToken(null)}
+              onReady={setCaptchaEnabled}
+            />
             <Errors errs={errs} />
             <Button type="submit" loading={busy} className="w-full">{t('register.submitTeacher')}</Button>
           </Form>

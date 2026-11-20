@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, type User } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
-import { Button, Card, Form, Field, Input } from '../../components/ui';
+import { Button, Card, Form, Field, Input, PasswordInput } from '../../components/ui';
 import { useI18n } from '../../i18n';
 import { IconShieldKeyhole } from '../../components/icons';
+import { Recaptcha, type RecaptchaRef } from '../../components/Recaptcha';
 
 export default function Login() {
   const nav = useNavigate();
@@ -15,6 +16,9 @@ export default function Login() {
   const { t } = useI18n();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
+  const recaptchaRef = useRef<RecaptchaRef>(null);
   const [mfaTicket, setMfaTicket] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -36,10 +40,14 @@ export default function Login() {
 
   const submit = async () => {
     if (!identifier.trim() || !password) { setErr(t('login.required')); return; }
+    if (captchaEnabled && !captchaToken) {
+      setErr(t('captcha.required'));
+      return;
+    }
     setErr(null);
     setBusy(true);
     try {
-      const res = await api.auth.login(identifier.trim(), password);
+      const res = await api.auth.login(identifier.trim(), password, captchaToken);
       const data = res.data;
 
       if (data && 'requireMfa' in data && data.requireMfa) {
@@ -54,6 +62,8 @@ export default function Login() {
       toast.push('success', t('login.success'));
       navigateAfterLogin(loggedInUser);
     } catch (e) {
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
       setErr(e instanceof Error ? e.message : t('login.failed'));
     } finally {
       setBusy(false);
@@ -137,13 +147,26 @@ export default function Login() {
             <Input dir="ltr" autoComplete="username" value={identifier} onChange={(e) => setIdentifier(e.target.value)} />
           </Field>
           <Field label={t('common.password')} required>
-            <Input type="password" dir="ltr" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </Field>
           <div className="text-end">
             <Link to="/forgot-password" className="text-xs text-gold-300 hover:text-gold-200">
               {t('login.forgot')}
             </Link>
           </div>
+          <Recaptcha
+            ref={recaptchaRef}
+            onVerify={(token) => {
+              setCaptchaToken(token);
+              setErr(null);
+            }}
+            onExpired={() => setCaptchaToken(null)}
+            onReady={setCaptchaEnabled}
+          />
           {err && <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-coral">{err}</p>}
           <Button type="submit" loading={busy} className="w-full">{t('common.login')}</Button>
         </Form>

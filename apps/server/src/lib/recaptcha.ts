@@ -127,18 +127,21 @@ export const recaptchaService = {
         };
       }
 
-      // فحص النتيجة (Score)
-      const minScore = settings.emergencyMode ? 0.7 : settings.recaptchaMinScore;
-      const score = data.score ?? 0.5;
+      const score = data.score;
 
-      if (score < minScore) {
-        if (clientIp) void ipBanService.recordAbuse(clientIp, 1);
-        return {
-          success: false,
-          score,
-          error: "تم تصنيف هذا الطلب كنشاط آلي أو عالي المخاطر.",
-          reasons: ["LOW_SCORE"],
-        };
+      // فحص النتيجة (Score) لـ reCAPTCHA v3 / Enterprise فقط (في v2 Checkbox، نجاح التحقق البشري كافٍ)
+      if (typeof score === "number") {
+        const minScore = settings.emergencyMode ? 0.7 : settings.recaptchaMinScore;
+
+        if (score < minScore) {
+          if (clientIp) void ipBanService.recordAbuse(clientIp, 1);
+          return {
+            success: false,
+            score,
+            error: "تم تصنيف هذا الطلب كنشاط آلي أو عالي المخاطر.",
+            reasons: ["LOW_SCORE"],
+          };
+        }
       }
 
       // فحص مطابقة الإجراء (Action)
