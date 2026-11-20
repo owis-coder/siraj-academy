@@ -4,12 +4,19 @@ import { Card } from '../../components/ui';
 
 type TabKey = 'privacy' | 'terms' | 'refund';
 
-export default function PrivacyPolicy() {
+export default function PrivacyPolicy({ defaultTab = 'privacy' }: { defaultTab?: TabKey }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabKey) || 'privacy';
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    ['privacy', 'terms', 'refund'].includes(initialTab) ? initialTab : 'privacy'
-  );
+  const urlTab = searchParams.get('tab') as TabKey;
+  const initial = (['privacy', 'terms', 'refund'].includes(urlTab) ? urlTab : defaultTab) || 'privacy';
+  const [activeTab, setActiveTab] = useState<TabKey>(initial);
+
+  useEffect(() => {
+    if (urlTab && ['privacy', 'terms', 'refund'].includes(urlTab)) {
+      setActiveTab(urlTab);
+    } else if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [urlTab, defaultTab]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

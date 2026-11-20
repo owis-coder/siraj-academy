@@ -63,16 +63,19 @@ export function Footer() {
             <li><Link className="transition-colors hover:text-gold-200" to="/requests/new">{t('footer.requestPrivate')}</Link></li>
             <li><Link className="transition-colors hover:text-gold-200" to="/register?tab=teacher">{t('footer.joinTeacher')}</Link></li>
           </ul>
-          <p className="mt-5 text-xs leading-6 text-ink-muted">{t('footer.legal')}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+            <Link to="/privacy" className="transition-colors hover:text-gold-200">سياسة الخصوصية</Link>
+            <span>·</span>
+            <Link to="/terms" className="transition-colors hover:text-gold-200">شروط الاستخدام</Link>
+            <span>·</span>
+            <Link to="/refund" className="transition-colors hover:text-gold-200">استرداد المبالغ</Link>
+          </div>
         </div>
       </div>
 
       <div className="border-t border-line/70">
         <div className="container-x flex flex-wrap items-center justify-between gap-2 py-4 text-xs text-ink-muted">
           <span>© {new Date().getFullYear()} {t('footer.rights')}</span>
-          <Link to="/privacy" className="font-medium text-ink-secondary transition-colors hover:text-gold-200">
-            سياسة الخصوصية
-          </Link>
           <span dir="ltr">WO549604202 · 0579769007</span>
         </div>
       </div>

@@ -163,7 +163,9 @@ export default function App() {
               />
               <Route path="about" element={<About />} />
               <Route path="faq" element={<Faq />} />
-              <Route path="privacy" element={<PrivacyPolicy />} />
+              <Route path="privacy" element={<PrivacyPolicy defaultTab="privacy" />} />
+              <Route path="terms" element={<PrivacyPolicy defaultTab="terms" />} />
+              <Route path="refund" element={<PrivacyPolicy defaultTab="refund" />} />
               <Route path="*" element={<NotFound />} />
             </Route>
 
