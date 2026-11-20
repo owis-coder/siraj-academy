@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { I18nProvider } from './i18n';
 import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
@@ -109,7 +110,8 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <BrowserRouter>
-          <Routes>
+            <Analytics />
+            <Routes>
             {/* ============ عام ============ */}
             <Route element={<PublicLayout />}>
               <Route index element={<Home />} />
