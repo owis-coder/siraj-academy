@@ -38,13 +38,11 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs.length]);
 
-  const send = async (file?: File | null) => {
-    if (!room || (!text.trim() && !file)) return;
+  const send = async () => {
+    if (!room || !text.trim()) return;
     setSending(true);
     try {
-      let attachmentUrl: string | undefined;
-      if (file) attachmentUrl = (await api.uploads.create(file)).data.url;
-      await api.chat.send(room.id, { body: text.trim() || undefined, attachmentUrl });
+      await api.chat.send(room.id, { body: text.trim() });
       setText('');
       const { data } = await api.chat.messages(room.id);
       setMsgs(data ?? []);
@@ -144,14 +142,6 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
 
       <div className="border-t border-line p-3">
         <div className="flex items-center gap-2">
-          <label className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-md border border-line text-ink-muted transition-colors hover:text-gold-200" title={t('chat.attach')}>
-            <IconAttachment className="size-4" />
-            <input
-              type="file"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void send(f); e.target.value = ''; }}
-            />
-          </label>
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
