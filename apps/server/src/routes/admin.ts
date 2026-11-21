@@ -846,6 +846,44 @@ router.patch(
 // المستخدمون
 // ============================================================
 router.get(
+  "/users/stats",
+  asyncHandler(async (_req, res) => {
+    const [
+      totalUsers,
+      studentsCount,
+      teachersCount,
+      adminsCount,
+      activeCount,
+      suspendedCount,
+      unverifiedCount,
+      pendingRecoveriesCount,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: "STUDENT" } }),
+      prisma.user.count({ where: { role: "TEACHER" } }),
+      prisma.user.count({ where: { role: "ADMIN" } }),
+      prisma.user.count({ where: { status: "ACTIVE" } }),
+      prisma.user.count({ where: { status: "SUSPENDED" } }),
+      prisma.user.count({ where: { emailVerified: false } }),
+      prisma.accountRecoveryRequest.count({ where: { status: "PENDING_APPROVAL" } }).catch(() => 0),
+    ]);
+
+    res.json({
+      data: {
+        totalUsers,
+        studentsCount,
+        teachersCount,
+        adminsCount,
+        activeCount,
+        suspendedCount,
+        unverifiedCount,
+        pendingRecoveriesCount,
+      },
+    });
+  }),
+);
+
+router.get(
   "/users",
   parseQuery(adminUserListSchema),
   asyncHandler(async (req, res) => {
@@ -868,7 +906,16 @@ router.get(
         ...skipTake(page, limit),
       }),
     ]);
-    res.json({ data: items, meta: pageMeta(total, page, limit) });
+    res.json({
+      data: {
+        items,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      meta: pageMeta(total, page, limit),
+    });
   }),
 );
 

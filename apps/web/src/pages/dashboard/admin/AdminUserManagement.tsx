@@ -105,10 +105,12 @@ export default function AdminUserManagement() {
   const loadStats = async () => {
     try {
       setLoadingStats(true);
-      const res = await api.admin.users.stats();
-      setStats(res.data);
+      const res = await api.admin.users.stats().catch(() => null);
+      if (res && res.data) {
+        setStats(res.data);
+      }
     } catch (err: any) {
-      console.error('Failed to load user management stats', err);
+      console.warn('Failed to load user management stats', err);
     } finally {
       setLoadingStats(false);
     }
@@ -126,10 +128,39 @@ export default function AdminUserManagement() {
         page,
         limit: 15,
       });
-      setUsers(res.data.items);
-      setTotalPages(res.data.totalPages || 1);
+      const rawData = res?.data as any;
+      const rawList: any[] = Array.isArray(rawData)
+        ? rawData
+        : Array.isArray(rawData?.items)
+        ? rawData.items
+        : [];
+
+      const safeItems: AdminUserListItem[] = rawList.map((u: any) => ({
+        id: u?.id || '',
+        fullName: u?.fullName || u?.username || 'مستخدم',
+        username: u?.username || '',
+        email: u?.email || '',
+        role: u?.role || 'STUDENT',
+        status: u?.status || 'ACTIVE',
+        emailVerified: !!u?.emailVerified,
+        emailVerifiedAt: u?.emailVerifiedAt || null,
+        whatsapp: u?.whatsapp || null,
+        level: u?.level || null,
+        avatarUrl: u?.avatarUrl || null,
+        createdAt: u?.createdAt || new Date().toISOString(),
+        updatedAt: u?.updatedAt || new Date().toISOString(),
+        activeSessionsCount: u?.activeSessionsCount ?? u?._count?.sessions ?? 0,
+        recoveryRequestsCount: u?.recoveryRequestsCount ?? u?._count?.targetRecoveries ?? 0,
+        teacherProfile: u?.teacherProfile || null,
+      }));
+
+      setUsers(safeItems);
+      const totalP = rawData?.totalPages ?? res?.meta?.totalPages ?? 1;
+      setTotalPages(Math.max(1, totalP));
     } catch (err: any) {
+      console.error('loadUsers error:', err);
       toast.push('error', err.message || 'فشل تحميل قائمة المستخدمين');
+      setUsers([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -143,15 +174,40 @@ export default function AdminUserManagement() {
         status: recoveryStatusFilter || undefined,
         page: recoveryPage,
         limit: 15,
-      });
-      setRecoveries(res.data.items);
-      setRecoveryTotalPages(res.data.totalPages || 1);
+      }).catch(() => null);
+
+      const rawData = res?.data as any;
+      const rawList: any[] = Array.isArray(rawData)
+        ? rawData
+        : Array.isArray(rawData?.items)
+        ? rawData.items
+        : [];
+      setRecoveries(rawList);
+      const totalP = rawData?.totalPages ?? res?.meta?.totalPages ?? 1;
+      setRecoveryTotalPages(Math.max(1, totalP));
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تحميل طلبات الاستعادة');
+      console.error('loadRecoveries error:', err);
+      setRecoveries([]);
     } finally {
       setLoadingRecoveries(false);
     }
   };
+
+  // Dynamic Stats Fallback
+  const displayStats = useMemo(() => {
+    if (stats) return stats;
+    const safeList = users || [];
+    return {
+      totalUsers: safeList.length,
+      studentsCount: safeList.filter((u) => u.role === 'STUDENT').length,
+      teachersCount: safeList.filter((u) => u.role === 'TEACHER').length,
+      adminsCount: safeList.filter((u) => u.role === 'ADMIN').length,
+      activeCount: safeList.filter((u) => u.status === 'ACTIVE').length,
+      suspendedCount: safeList.filter((u) => u.status === 'SUSPENDED').length,
+      unverifiedCount: safeList.filter((u) => !u.emailVerified).length,
+      pendingRecoveriesCount: safeList.filter((u) => (u.recoveryRequestsCount ?? 0) > 0).length,
+    };
+  }, [stats, users]);
 
   useEffect(() => {
     loadStats();
@@ -440,9 +496,9 @@ export default function AdminUserManagement() {
             }`}
           >
             <span>{lang === 'ar' ? 'طلبات الاستعادة' : 'Recovery Requests'}</span>
-            {stats && stats.pendingRecoveriesCount > 0 && (
+            {displayStats.pendingRecoveriesCount > 0 && (
               <span className="ms-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-bold">
-                {stats.pendingRecoveriesCount}
+                {displayStats.pendingRecoveriesCount}
               </span>
             )}
           </button>
@@ -453,31 +509,31 @@ export default function AdminUserManagement() {
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'إجمالي المستخدمين' : 'Total Users'}</div>
-          <div className="text-xl font-bold text-ink-primary mt-1">{stats?.totalUsers ?? '...'}</div>
+          <div className="text-xl font-bold text-ink-primary mt-1">{displayStats.totalUsers}</div>
         </div>
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'الطلاب' : 'Students'}</div>
-          <div className="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1">{stats?.studentsCount ?? '...'}</div>
+          <div className="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1">{displayStats.studentsCount}</div>
         </div>
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'المدرسون' : 'Teachers'}</div>
-          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{stats?.teachersCount ?? '...'}</div>
+          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{displayStats.teachersCount}</div>
         </div>
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'الحسابات النشطة' : 'Active'}</div>
-          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{stats?.activeCount ?? '...'}</div>
+          <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{displayStats.activeCount}</div>
         </div>
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'الحسابات المعلقة' : 'Suspended'}</div>
-          <div className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">{stats?.suspendedCount ?? '...'}</div>
+          <div className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">{displayStats.suspendedCount}</div>
         </div>
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'بريد غير موثق' : 'Unverified Email'}</div>
-          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{stats?.unverifiedCount ?? '...'}</div>
+          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{displayStats.unverifiedCount}</div>
         </div>
         <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
           <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'بانتظار الاعتماد' : 'Pending Approval'}</div>
-          <div className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">{stats?.pendingRecoveriesCount ?? '...'}</div>
+          <div className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">{displayStats.pendingRecoveriesCount}</div>
         </div>
       </div>
 
@@ -564,14 +620,14 @@ export default function AdminUserManagement() {
                       <div>{lang === 'ar' ? 'جاري تحميل المستخدمين...' : 'Loading users...'}</div>
                     </td>
                   </tr>
-                ) : users.length === 0 ? (
+                ) : (users || []).length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-ink-secondary">
                       {lang === 'ar' ? 'لا توجد حسابات مطابقة لمعايير البحث' : 'No users match criteria'}
                     </td>
                   </tr>
                 ) : (
-                  users.map((u) => (
+                  (users || []).map((u) => (
                     <tr key={u.id} className="hover:bg-elevated/40 transition">
                       {/* Name & Username */}
                       <td className="py-3 px-4">
@@ -770,18 +826,18 @@ export default function AdminUserManagement() {
                       <div>{lang === 'ar' ? 'جاري تحميل طلبات الاستعادة...' : 'Loading recovery requests...'}</div>
                     </td>
                   </tr>
-                ) : recoveries.length === 0 ? (
+                ) : (recoveries || []).length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-ink-secondary">
                       {lang === 'ar' ? 'لا توجد طلبات استعادة مطابقة' : 'No recovery requests found'}
                     </td>
                   </tr>
                 ) : (
-                  recoveries.map((r) => (
+                  (recoveries || []).map((r) => (
                     <tr key={r.id} className="hover:bg-elevated/40 transition">
                       <td className="py-3 px-4 font-mono font-bold text-gold-500">{r.recoveryNo}</td>
                       <td className="py-3 px-4 font-medium text-ink-primary">
-                        {r.user.fullName} (@{r.user.username})
+                        {r.user?.fullName || 'User'} (@{r.user?.username || '—'})
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                         {r.alternativeEmail}
@@ -830,7 +886,7 @@ export default function AdminUserManagement() {
                             : r.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-ink-muted">{r.initiator.fullName}</td>
+                      <td className="py-3 px-4 text-ink-muted">{r.initiator?.fullName || 'Admin'}</td>
                       <td className="py-3 px-4 text-center">
                         {r.status === 'PENDING_APPROVAL' ? (
                           <button
