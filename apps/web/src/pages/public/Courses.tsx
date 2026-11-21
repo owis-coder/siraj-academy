@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api, type University, type College, type Major, type Course } from '../../lib/api';
-import { Card, Input, Select, Button, SkeletonGrid, EmptyState, Pagination } from '../../components/ui';
+import { Card, Input, Select, Button, SkeletonGrid, EmptyState, Pagination, AnimatedCounter } from '../../components/ui';
 import { CourseCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
 import { useI18n } from '../../i18n';
@@ -125,7 +125,16 @@ export default function Courses() {
         </aside>
 
         <div>
-          <p className="mb-4 text-sm text-ink-muted">{t('courses.results', { count: (meta.total ?? courses.length).toLocaleString() })}</p>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/70 px-4 py-2.5 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center gap-2.5 text-sm font-medium text-ink-secondary">
+              <span className="flex size-2 rounded-full bg-teal animate-pulse" />
+              <span>المقررات الدراسية المتاحة:</span>
+              <span className="inline-flex items-center rounded-lg bg-teal/10 px-3 py-0.5 text-base font-extrabold text-teal ring-1 ring-teal/20">
+                <AnimatedCounter value={meta.total ?? courses.length} suffix=" مقرر" />
+              </span>
+            </div>
+            <span className="text-xs text-ink-muted">محتوى أكاديمي معتمد</span>
+          </div>
           {loading ? (
             <SkeletonGrid count={6} />
           ) : courses.length === 0 ? (

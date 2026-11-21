@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type ExplainRequest, type ChatRoom, type Notification, type Course, type Offer } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
-import { Card, Badge, Button, Skeleton, EmptyState, Form, Field, Input } from '../../../components/ui';
+import { Card, Badge, Button, Skeleton, EmptyState, Form, Field, Input, AnimatedCounter } from '../../../components/ui';
 import { REQUEST_STATUS_LABEL, REQUEST_STATUS_TONE, formatDateTime, formatMoney } from '../../../lib/format';
 import { ChatThread } from '../../../components/ChatThread';
 import { useI18n } from '../../../i18n';
@@ -39,9 +39,16 @@ export function MyCourses() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t('sd.myCoursesTitle')}</h1>
-        <p className="mt-1 text-sm text-ink-muted">{t('sd.myCoursesSubtitle')}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{t('sd.myCoursesTitle')}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{t('sd.myCoursesSubtitle')}</p>
+        </div>
+        {!loading && items.length > 0 && (
+          <span className="inline-flex items-center rounded-lg bg-gold-500/10 px-3 py-1 text-sm font-bold text-gold-300 ring-1 ring-gold-500/20">
+            <AnimatedCounter value={items.length} suffix=" مقرر مسجل" />
+          </span>
+        )}
       </div>
       {loading ? <Skeleton className="h-48 w-full" /> : err ? (
         <EmptyState title={t('sd.coursesLoadFailed')} hint={t('sd.coursesServerHint')} />
@@ -87,7 +94,14 @@ export function MyRequests() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('sd.requestsTitle')}</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold">{t('sd.requestsTitle')}</h1>
+            {!loading && items.length > 0 && (
+              <span className="inline-flex items-center rounded-lg bg-gold-500/10 px-2.5 py-0.5 text-xs font-bold text-gold-300 ring-1 ring-gold-500/20">
+                <AnimatedCounter value={items.length} suffix=" طلب" />
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-ink-muted">{t('sd.requestsSubtitle')}</p>
         </div>
         <Link to="/requests/new"><Button>{t('sd.newRequest')}</Button></Link>

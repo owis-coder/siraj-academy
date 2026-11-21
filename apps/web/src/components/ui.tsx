@@ -1,6 +1,9 @@
 import { useState, type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type FormEvent } from 'react';
 import { useI18n } from '../i18n';
 import { IconClose, IconChevronDown, IconCheck, IconFolder, IconEye, IconEyeOff } from './icons';
+import { AnimatedCounter } from './AnimatedCounter';
+
+export { AnimatedCounter };
 
 /* ============ Button ============ */
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -249,11 +252,13 @@ export function SkeletonGrid({ count = 6, className = '' }: { count?: number; cl
 export function StatCard({ label, value, hint, tone = 'gold' }: { label: string; value: string | number | null | undefined; hint?: string; tone?: 'gold' | 'teal' | 'ok' | 'coral' }) {
   const bar = { gold: 'bg-gold-grad', teal: 'bg-teal/60', ok: 'bg-ok/60', coral: 'bg-coral/60' }[tone];
   return (
-    <Card hover className="relative overflow-hidden p-5">
+    <Card hover className="group relative overflow-hidden p-5 transition-all duration-300 hover:shadow-lg hover:shadow-gold-500/5">
       <span className={`absolute inset-y-0 start-0 w-1 ${bar}`} aria-hidden />
       <p className="text-sm text-ink-muted">{label}</p>
       <p className="mt-2 font-bold text-ink-primary">
-        <span className="text-2xl sm:text-3xl">{value ?? '—'}</span>
+        <span className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+          <AnimatedCounter value={value} />
+        </span>
       </p>
       {hint && <p className="mt-1 text-xs text-ink-muted">{hint}</p>}
     </Card>

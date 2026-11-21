@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState, type ComponentType } from 'react';
 import { api, type University, type Course, type ExplainRequest, type Service } from '../../lib/api';
-import { Button, Card, Badge, SkeletonGrid, Accordion, StatCard } from '../../components/ui';
+import { Button, Card, Badge, SkeletonGrid, Accordion, StatCard, AnimatedCounter } from '../../components/ui';
 import { UniversityCard, CourseCard, RequestCard, ServiceCard } from '../../components/cards';
 import { useI18n } from '../../i18n';
 import {
@@ -88,7 +88,14 @@ export default function Home() {
       <section className="container-x py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold">{t('home.universities.title')}</h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-2xl font-bold">{t('home.universities.title')}</h2>
+              {universities.length > 0 && (
+                <span className="inline-flex items-center rounded-full bg-gold-500/10 px-2.5 py-0.5 text-xs font-bold text-gold-300 ring-1 ring-gold-500/20">
+                  <AnimatedCounter value={universities.length} suffix=" جامعة" />
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-ink-muted">{t('home.universities.subtitle')}</p>
           </div>
           <Link to="/universities" className="inline-flex items-center gap-1.5 text-sm text-gold-300 transition-colors hover:text-gold-200">
@@ -113,7 +120,14 @@ export default function Home() {
       <section className="container-x py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold">{t('home.requests.title')}</h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-2xl font-bold">{t('home.requests.title')}</h2>
+              {requests.length > 0 && (
+                <span className="inline-flex items-center rounded-full bg-gold-500/10 px-2.5 py-0.5 text-xs font-bold text-gold-300 ring-1 ring-gold-500/20">
+                  <AnimatedCounter value={requests.length} suffix=" طلب" />
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-ink-muted">{t('home.requests.subtitle')}</p>
           </div>
           <Link to="/requests" className="inline-flex items-center gap-1.5 text-sm text-gold-300 transition-colors hover:text-gold-200">
@@ -141,7 +155,14 @@ export default function Home() {
       <section className="container-x py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold">{t('home.courses.title')}</h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-2xl font-bold">{t('home.courses.title')}</h2>
+              {courses.length > 0 && (
+                <span className="inline-flex items-center rounded-full bg-teal/10 px-2.5 py-0.5 text-xs font-bold text-teal ring-1 ring-teal/20">
+                  <AnimatedCounter value={courses.length} suffix=" مقرر" />
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-ink-muted">{t('home.courses.subtitle')}</p>
           </div>
           <Link to="/courses" className="inline-flex items-center gap-1.5 text-sm text-gold-300 transition-colors hover:text-gold-200">

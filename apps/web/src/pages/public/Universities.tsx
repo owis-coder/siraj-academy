@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, type University } from '../../lib/api';
-import { Pagination } from '../../components/ui';
+import { Pagination, SkeletonGrid, EmptyState, Input, AnimatedCounter } from '../../components/ui';
 import { UniversityCard } from '../../components/cards';
-import { SkeletonGrid, EmptyState, Input } from '../../components/ui';
 import { PageHeader } from '../../components/PageHeader';
 import { useI18n } from '../../i18n';
 
@@ -50,7 +49,16 @@ export default function Universities() {
         <EmptyState title={t('universities.emptyTitle')} hint={t('universities.emptyHint')} />
       ) : (
         <>
-          <p className="mb-4 text-sm text-ink-muted">{t('universities.count', { count: state.total.toLocaleString() })}</p>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/70 px-4 py-3 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center gap-2.5 text-sm font-medium text-ink-secondary">
+              <span className="flex size-2 rounded-full bg-gold-400 animate-pulse" />
+              <span>الجامعات السعودية المعتمدة:</span>
+              <span className="inline-flex items-center rounded-lg bg-gold-500/10 px-3 py-0.5 text-base font-extrabold text-gold-300 ring-1 ring-gold-500/20">
+                <AnimatedCounter value={state.total} suffix=" جامعة" />
+              </span>
+            </div>
+            <span className="text-xs text-ink-muted">تغطية شاملة لكافة مناطق المملكة</span>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {state.items.map((u) => (
               <UniversityCard key={u.id} u={u} />

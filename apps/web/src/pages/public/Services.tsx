@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type Service } from '../../lib/api';
-import { Button, Card, Input, Select, SkeletonGrid, EmptyState } from '../../components/ui';
+import { Button, Card, Input, Select, SkeletonGrid, EmptyState, AnimatedCounter } from '../../components/ui';
 import { ServiceCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
 import { SERVICE_CATEGORY_LABEL } from '../../lib/format';
@@ -51,6 +51,18 @@ export default function Services() {
           ))}
         </Select>
       </div>
+      {!loading && items.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/70 px-4 py-2.5 shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 text-sm font-medium text-ink-secondary">
+            <span className="flex size-2 rounded-full bg-gold-400 animate-pulse" />
+            <span>الخدمات الطلابية المتاحة:</span>
+            <span className="inline-flex items-center rounded-lg bg-gold-500/10 px-3 py-0.5 text-base font-extrabold text-gold-300 ring-1 ring-gold-500/20">
+              <AnimatedCounter value={items.length} suffix=" خدمة" />
+            </span>
+          </div>
+          <span className="text-xs text-ink-muted">خدمات طلابية وأكاديمية متكاملة</span>
+        </div>
+      )}
       {loading ? (
         <SkeletonGrid count={8} />
       ) : items.length === 0 ? (

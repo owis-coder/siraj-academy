@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Order, type ExplainRequest, type Ad } from '../../../lib/api';
-import { Card, Badge, Button, StatCard, Skeleton, EmptyState, Modal, Form, Field, Input, Select, Textarea, Pagination } from '../../../components/ui';
+import { Card, Badge, Button, StatCard, Skeleton, EmptyState, Modal, Form, Field, Input, Select, Textarea, Pagination, AnimatedCounter } from '../../../components/ui';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE, REQUEST_STATUS_LABEL, REQUEST_STATUS_TONE, formatDateTime, formatMoney, TEACHER_STATUS_LABEL, AD_STATUS_LABEL, OFFERING_STATUS_LABEL } from '../../../lib/format';
 import { useToast } from '../../../lib/toast';
 import { useI18n } from '../../../i18n';
@@ -95,10 +95,12 @@ function BarList({ title, rows, loading }: { title: string; rows: { name: string
             <div key={i}>
               <div className="mb-1 flex justify-between text-xs">
                 <span className="truncate text-ink-secondary">{r.name}</span>
-                <span className="text-gold-300">{formatNumber(r.value)}</span>
+                <span className="font-semibold text-gold-300">
+                  <AnimatedCounter value={r.value} />
+                </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-elevated">
-                <div className="h-full rounded-full bg-gold-grad" style={{ width: `${(r.value / max) * 100}%` }} />
+                <div className="h-full rounded-full bg-gold-grad transition-all duration-1000 ease-out" style={{ width: `${(r.value / max) * 100}%` }} />
               </div>
             </div>
           ))}

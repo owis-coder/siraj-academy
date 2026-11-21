@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, type Course, type Service, type University } from '../../lib/api';
-import { Tabs, Card, Badge, Skeleton, EmptyState, Button } from '../../components/ui';
+import { Tabs, Card, Badge, Skeleton, EmptyState, Button, AnimatedCounter } from '../../components/ui';
 import { ServiceCard, TeacherCard } from '../../components/cards';
 import { formatMoney } from '../../lib/format';
 import { useI18n } from '../../i18n';
@@ -80,9 +80,24 @@ export default function UniversityProfile() {
             <p className="mt-1 text-sm text-ink-muted">{u?.city ?? t('universityProfile.saudi')}</p>
           </div>
           <div className="ms-auto flex gap-6 text-center text-sm">
-            <div><p className="text-xl font-bold text-gold-300">{coursesCount.toLocaleString()}</p><p className="text-ink-muted">{t('universityProfile.courses')}</p></div>
-            <div><p className="text-xl font-bold text-gold-300">{teachers.length.toLocaleString()}</p><p className="text-ink-muted">{t('universityProfile.teachers')}</p></div>
-            <div><p className="text-xl font-bold text-gold-300">{services.length.toLocaleString()}</p><p className="text-ink-muted">{t('universityProfile.services')}</p></div>
+            <div>
+              <p className="text-xl font-bold text-gold-300">
+                <AnimatedCounter value={coursesCount} />
+              </p>
+              <p className="text-ink-muted">{t('universityProfile.courses')}</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-gold-300">
+                <AnimatedCounter value={teachers.length} />
+              </p>
+              <p className="text-ink-muted">{t('universityProfile.teachers')}</p>
+            </div>
+            <div>
+              <p className="text-xl font-bold text-gold-300">
+                <AnimatedCounter value={services.length} />
+              </p>
+              <p className="text-ink-muted">{t('universityProfile.services')}</p>
+            </div>
           </div>
         </div>
       </Card>

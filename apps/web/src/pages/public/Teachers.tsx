@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api, type University, type User, type TeacherProfile } from '../../lib/api';
-import { Input, Select, SkeletonGrid, EmptyState, Pagination, Button } from '../../components/ui';
+import { Input, Select, SkeletonGrid, EmptyState, Pagination, Button, AnimatedCounter } from '../../components/ui';
 import { TeacherCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
 import { useI18n } from '../../i18n';
@@ -61,7 +61,16 @@ export default function Teachers() {
           <option value="old">{t('teachers.oldest')}</option>
         </Select>
       </div>
-      <p className="mb-4 text-sm text-ink-muted">{t('teachers.count', { count: (meta.total ?? items.length).toLocaleString() })}</p>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/70 px-4 py-2.5 shadow-sm backdrop-blur-sm">
+        <div className="flex items-center gap-2.5 text-sm font-medium text-ink-secondary">
+          <span className="flex size-2 rounded-full bg-gold-400 animate-pulse" />
+          <span>المعلمون والأساتذة المعتمدون:</span>
+          <span className="inline-flex items-center rounded-lg bg-gold-500/10 px-3 py-0.5 text-base font-extrabold text-gold-300 ring-1 ring-gold-500/20">
+            <AnimatedCounter value={meta.total ?? items.length} suffix=" معلم" />
+          </span>
+        </div>
+        <span className="text-xs text-ink-muted">نخبة من الأساتذة الأكاديميين المعتمدين</span>
+      </div>
       {loading ? (
         <SkeletonGrid count={6} />
       ) : items.length === 0 ? (
