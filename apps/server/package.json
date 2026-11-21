@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx prisma/seed.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
+    "seed:demo:diverse": "tsx prisma/seed-demo-diverse.ts",
     "seed:demo:clean": "tsx prisma/seed-demo-cleanup.ts",
     "test:api": "tsx tests/api-permissions.ts && tsx tests/api-files-payments.ts",
     "test:account": "tsx tests/account-security.ts",

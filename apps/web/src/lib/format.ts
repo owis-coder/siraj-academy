@@ -82,6 +82,7 @@ export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
 export const OFFERING_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'status.offering.DRAFT',
   PENDING_REVIEW: 'status.offering.PENDING_REVIEW',
+  NEEDS_REVISION: 'status.offering.NEEDS_REVISION',
   PUBLISHED: 'status.offering.PUBLISHED',
   HIDDEN: 'status.offering.HIDDEN',
   REJECTED: 'status.offering.REJECTED',

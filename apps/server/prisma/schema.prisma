@@ -43,8 +43,17 @@ enum AccessType {
 enum OfferingStatus {
   DRAFT
   PENDING_REVIEW
+  NEEDS_REVISION
   PUBLISHED
   HIDDEN
+  REJECTED
+}
+
+// حالة مراجعة قطعة محتوى (فيديو، درس، مرفق، رابط) — لا يظهر للطلاب إلا APPROVED
+enum ReviewStatus {
+  PENDING_REVIEW
+  APPROVED
+  NEEDS_REVISION
   REJECTED
 }
 
@@ -69,8 +78,13 @@ enum Urgency {
   TERM
 }
 
+// PENDING: انتظار مراجعة الإدارة | APPROVED: اعتمدته الإدارة وعُرض على الطالب
+// NEEDS_REVISION: تعيده الإدارة للمدرس | ACCEPTED: قبله الطالب بعد اعتماد الإدارة
+// REJECTED: مرفوض أو لم يُختر
 enum OfferStatus {
   PENDING
+  APPROVED
+  NEEDS_REVISION
   ACCEPTED
   REJECTED
 }
@@ -418,6 +432,9 @@ model CourseOffering {
   price         Float
   trialVideoUrl String?
   youtubeUrls   Json?
+  // روابط YouTube التي اعتمدتها الإدارة فقط هي ما يظهر للطلاب
+  approvedYoutubeUrls Json?
+  trialVideoStatus    ReviewStatus @default(APPROVED)
   accessType    AccessType     @default(PAID)
   status        OfferingStatus @default(DRAFT)
   adminNote     String?
@@ -444,6 +461,9 @@ model Lesson {
   videoUrl   String
   access     AccessType @default(PAID)
   order      Int        @default(0)
+  // لا يُعرض رابط الدرس للطلاب قبل اعتماد الإدارة
+  reviewStatus ReviewStatus @default(APPROVED)
+  reviewNote   String?
   createdAt  DateTime   @default(now())
 
   offering CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
@@ -523,9 +543,14 @@ model Offer {
   requestId    String
   teacherId    String
   price        Float
+  // السعر الذي تعتمده الإدارة ويُعرض على الطالب (قد يختلف عن سعر المدرس)
+  approvedPrice Float?
   message      String?
   timelineDays Int?
   status       OfferStatus @default(PENDING)
+  adminNote    String?
+  reviewedById String?
+  reviewedAt   DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -680,6 +705,27 @@ model Ad {
 
   @@index([teacherId])
   @@index([status])
+}
+
+// ---------- سجل فحص المحتوى (Content Moderation Log) ----------
+// كل محتوى مشبوه أو مرفوض يُسجَّل هنا لمراجعة الإدارة، مع سبب الرفض.
+model ContentModerationLog {
+  id             String   @id @default(cuid())
+  entityType     String   // OFFERING, LESSON, OFFER, EXPLAIN_REQUEST, CUSTOM_REQUEST, AD, PROFILE, MESSAGE, UPLOAD
+  entityId       String?
+  field          String
+  status         String   // NEEDS_REVIEW, REJECTED, APPROVED
+  reasons        Json?    // قائمة أكواد الأسباب
+  snippet        String?  // مقتطف منقّح من المحتوى (بلا بيانات حساسة كاملة)
+  contentOwnerId String?
+  reviewedById   String?
+  decisionNote   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ---------- الإشعارات ----------

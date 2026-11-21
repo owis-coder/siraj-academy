@@ -22,7 +22,7 @@ export const updateOfferingSchema = z.object({
   price: z.coerce.number().min(0).max(100000).optional(),
   trialVideoUrl: z.string().url().max(400).nullable().optional(),
   youtubeUrls: z.array(z.string().url().max(400)).max(30).nullable().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN"]).optional(),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "NEEDS_REVISION", "PUBLISHED", "HIDDEN"]).optional(),
 });
 
 export const lessonCreateSchema = z.object({
@@ -49,7 +49,7 @@ export const liveSessionCreateSchema = z.object({
 });
 
 export const offeringListQuerySchema = paginationSchema.extend({
-  status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN", "REJECTED"]).optional(),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "NEEDS_REVISION", "PUBLISHED", "HIDDEN", "REJECTED"]).optional(),
   universityId: z.string().min(1).optional(),
   courseId: z.string().min(1).optional(),
 });

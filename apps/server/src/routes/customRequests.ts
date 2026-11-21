@@ -9,6 +9,7 @@ import { requireAuth } from "../middleware/auth";
 import { parseBody, parseQuery } from "../middleware/validate";
 import { asyncHandler } from "../middleware/errorHandler";
 import { createCustomRequestSchema, listCustomRequestsQuerySchema } from "../validation/customRequests";
+import { reviewContent } from "../lib/moderationLog";
 import { pageMeta, skipTake } from "../validation/common";
 import { audit } from "../lib/audit";
 
@@ -36,6 +37,20 @@ router.post(
 
     const requestNo = await generateNextCustomRequestNo();
     const typeArabic = CUSTOM_REQUEST_TYPE_ARABIC[data.requestType] || data.requestType;
+
+    // فحص محتوى الطلب قبل الحفظ — تُمنع فيه بيانات الاتصال ونقل التواصل
+    await reviewContent({
+      entityType: "CUSTOM_REQUEST",
+      contentOwnerId: user.id,
+      fields: {
+        title: data.title,
+        description: data.description,
+        deadline: data.deadline,
+        attachments: Array.isArray(data.attachments)
+          ? data.attachments.map((a: { name?: string; url?: string }) => `${a.name ?? ""} ${a.url ?? ""}`).join(" ")
+          : undefined,
+      },
+    });
 
     // حفظ الطلب في قاعدة البيانات أولاً
     const customRequest = await prisma.customServiceRequest.create({

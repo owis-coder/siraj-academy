@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type Order, type ExplainRequest, type Ad } from '../../../lib/api';
+import { api, type Order, type ExplainRequest, type Ad, type Offer } from '../../../lib/api';
 import { Card, Badge, Button, StatCard, Skeleton, EmptyState, Modal, Form, Field, Input, Select, Textarea, Pagination, AnimatedCounter } from '../../../components/ui';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE, REQUEST_STATUS_LABEL, REQUEST_STATUS_TONE, formatDateTime, formatMoney, TEACHER_STATUS_LABEL, AD_STATUS_LABEL, OFFERING_STATUS_LABEL } from '../../../lib/format';
 import { useToast } from '../../../lib/toast';
@@ -984,6 +984,7 @@ export function AdminOfferings() {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [rejectId, setRejectId] = useState<string | null>(null);
+  const [reviseId, setReviseId] = useState<string | null>(null);
   const toast = useToast();
 
   const load = () => {
@@ -1011,9 +1012,12 @@ export function AdminOfferings() {
                 {o.adminNote ? <p className="mt-1 text-xs text-coral">{t('ad.noteLabel', { note: String(o.adminNote) })}</p> : null}
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={o.status === 'PUBLISHED' ? 'ok' : o.status === 'PENDING_REVIEW' ? 'warn' : o.status === 'HIDDEN' ? 'info' : o.status === 'REJECTED' ? 'danger' : 'muted'}>{t(OFFERING_STATUS_LABEL[String(o.status)])}</Badge>
-                {o.status === 'PENDING_REVIEW' && (
+                <Badge tone={o.status === 'PUBLISHED' ? 'ok' : o.status === 'PENDING_REVIEW' || o.status === 'NEEDS_REVISION' ? 'warn' : o.status === 'HIDDEN' ? 'info' : o.status === 'REJECTED' ? 'danger' : 'muted'}>{t(OFFERING_STATUS_LABEL[String(o.status)])}</Badge>
+                {(o.status === 'PENDING_REVIEW' || o.status === 'NEEDS_REVISION' || o.status === 'HIDDEN') && (
                   <Button size="sm" onClick={async () => { try { await crud.update(String(o.id), { status: 'PUBLISHED' }); load(); toast.push('success', t('ad.offeringApproved')); } catch { toast.push('error', t('ad.approveFailed')); } }}>{t('ad.approvePublish')}</Button>
+                )}
+                {(o.status === 'PENDING_REVIEW' || o.status === 'HIDDEN') && (
+                  <Button size="sm" variant="subtle" onClick={() => setReviseId(String(o.id))}>طلب تعديل</Button>
                 )}
                 {o.status !== 'HIDDEN' && <Button size="sm" variant="ghost" onClick={async () => { try { await crud.update(String(o.id), { status: 'HIDDEN' }); load(); } catch { toast.push('error', t('ad.actionFailed')); } }}>{t('ad.hide')}</Button>}
                 {o.status === 'HIDDEN' && <Button size="sm" variant="ghost" onClick={async () => { try { await crud.update(String(o.id), { status: 'PUBLISHED' }); load(); } catch { toast.push('error', t('ad.actionFailed')); } }}>{t('ad.show')}</Button>}
@@ -1027,6 +1031,17 @@ export function AdminOfferings() {
           ))}
         </div>
       )}
+      <RejectModal
+        open={Boolean(reviseId)}
+        title="طلب تعديل الدورة"
+        placeholder="اكتب ما يجب تعديله ليصل للمدرّس..."
+        onClose={() => setReviseId(null)}
+        onSubmit={async (reason) => {
+          await crud.update(reviseId!, { status: 'NEEDS_REVISION', adminNote: reason });
+          load();
+          toast.push('success', 'أُرسلت الدورة للمدرس للتعديل');
+        }}
+      />
       <RejectModal
         open={Boolean(rejectId)}
         title={t('ad.reject') + ' ' + (t('ad.offering') || 'الدورة')}
@@ -1507,6 +1522,165 @@ export function AdminBroadcast() {
           <Button type="submit" loading={busy}>{t('ad.sendAll')}</Button>
         </Form>
       </Card>
+    </div>
+  );
+}
+
+/* ============ مركز المراجعة الموحّد ============ */
+// يجمع: طوابير الدورات/الدروس/الإعلانات، سجل المحتوى المشبوه، وعروض المدرسين الداخلية.
+// لا تُعرض أي عروض للطلاب من هنا؛ الاعتماد يرسل عرضًا واحدًا فقط.
+export function AdminModeration() {
+  const { t } = useI18n();
+  const toast = useToast();
+  const [queue, setQueue] = useState<Record<string, number> | null>(null);
+  const [logs, setLogs] = useState<Record<string, unknown>[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [revise, setRevise] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    Promise.allSettled([
+      api.admin.special.reviewQueue(),
+      api.admin.special.moderation({ status: 'NEEDS_REVIEW' }),
+      api.admin.special.offers(),
+    ]).then(([q, l, o]) => {
+      setQueue(q.status === 'fulfilled' ? (q.value.data as unknown as Record<string, number>) : null);
+      setLogs(l.status === 'fulfilled' ? (l.value.data ?? []) : []);
+      setOffers(o.status === 'fulfilled' ? (o.value.data ?? []) : []);
+      setLoading(false);
+    });
+  };
+  useEffect(load, []);
+
+  const pendingOffers = offers.filter((o) => o.status === 'PENDING' || o.status === 'NEEDS_REVISION');
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold">{t('dash.reviewCenter')}</h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          الإدارة هي الوسيط الوحيد بين الطالب والمدرس: مراجعة المحتوى، اعتماد الدورات والفيديوهات، واختيار عرض واحد لكل طلب.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard label="دورات بانتظار المراجعة" value={queue ? String(queue.pendingOfferings ?? 0) : null} />
+        <StatCard label="دورات تحتاج تعديلًا" value={queue ? String(queue.needsRevisionOfferings ?? 0) : null} />
+        <StatCard label="دروس بانتظار اعتماد الرابط" value={queue ? String(queue.pendingLessons ?? 0) : null} />
+        <StatCard label="إعلانات بانتظار المراجعة" value={queue ? String(queue.pendingAds ?? 0) : null} />
+        <StatCard label="محتوى مشبوه" value={queue ? String(queue.moderationOpen ?? 0) : null} />
+      </div>
+
+      <Card>
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="font-bold text-gold-200">عروض المدرسين الداخلية</h2>
+          <p className="mt-1 text-xs text-ink-muted">
+            العروض لا تصل للطالب. راجع المبررات والمدة والسعر، ثم اعتمد عرضًا واحدًا فقط.
+          </p>
+        </div>
+        {loading ? (
+          <div className="p-5"><Skeleton className="h-24 w-full" /></div>
+        ) : pendingOffers.length === 0 ? (
+          <div className="p-5"><EmptyState compact title="لا توجد عروض بانتظار المراجعة" /></div>
+        ) : (
+          <div className="divide-y divide-line/60">
+            {pendingOffers.map((o) => (
+              <div key={o.id} className="space-y-2 px-5 py-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold">{o.teacher?.fullName ?? 'مدرّس'}</p>
+                  <Badge tone={o.status === 'PENDING' ? 'warn' : 'info'}>{o.status === 'PENDING' ? 'بانتظار المراجعة' : 'تعديل مطلوب'}</Badge>
+                  <span className="text-xs text-ink-muted">سعر المدرس: {formatMoney(o.price)}</span>
+                </div>
+                {o.message && <p className="max-w-3xl whitespace-pre-line text-ink-secondary">{o.message}</p>}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Input
+                    type="number"
+                    className="w-28"
+                    aria-label="السعر النهائي للطالب"
+                    value={prices[o.id] ?? String(o.approvedPrice ?? o.price)}
+                    onChange={(e) => setPrices((s) => ({ ...s, [o.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await api.admin.special.offerApprove(o.id, {
+                          approvedPrice: Number(prices[o.id] ?? o.approvedPrice ?? o.price),
+                        });
+                        toast.push('success', 'اعتُمد العرض وأُرسل للطالب');
+                        load();
+                      } catch (e) {
+                        toast.push('error', e instanceof Error ? e.message : 'تعذر اعتماد العرض');
+                      }
+                    }}
+                  >
+                    اعتماد وإرسال للطالب
+                  </Button>
+                  <Button size="sm" variant="subtle" onClick={() => setRevise(o.id)}>طلب تعديل</Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={async () => {
+                      try { await api.admin.special.offerReject(o.id); load(); } catch { toast.push('error', 'تعذر الرفض'); }
+                    }}
+                  >
+                    رفض
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="font-bold text-gold-200">محتوى مشبوه يحتاج مراجعة</h2>
+          <p className="mt-1 text-xs text-ink-muted">لا يُنشر أي محتوى يحتاج مراجعة قبل اعتماد الإدارة.</p>
+        </div>
+        {loading ? (
+          <div className="p-5"><Skeleton className="h-24 w-full" /></div>
+        ) : logs.length === 0 ? (
+          <div className="p-5"><EmptyState compact title="لا يوجد محتوى مشبوه" /></div>
+        ) : (
+          <div className="divide-y divide-line/60">
+            {logs.map((row) => (
+              <div key={String(row.id)} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium">{String(row.entityType)} · {String(row.field)}</p>
+                  {row.snippet ? <p className="mt-1 text-xs text-ink-muted">{String(row.snippet)}</p> : null}
+                </div>
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  onClick={async () => {
+                    try {
+                      await api.admin.special.moderationDecision(String(row.id), { status: 'APPROVED' });
+                      load();
+                    } catch { toast.push('error', 'تعذر تحديث السجل'); }
+                  }}
+                >
+                  اعتماد المراجعة
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <RejectModal
+        open={Boolean(revise)}
+        title="طلب تعديل العرض"
+        placeholder="اكتب ما يجب تعديله (السعر/المدة/المبرر)..."
+        onClose={() => setRevise(null)}
+        onSubmit={async (reason) => {
+          await api.admin.special.offerRequestChanges(revise!, reason);
+          load();
+          toast.push('success', 'أُرسل طلب التعديل للمدرس');
+        }}
+      />
     </div>
   );
 }

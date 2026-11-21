@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, ApiError, type ExplainRequest, type Offer } from '../../lib/api';
+import { api, ApiError, type ExplainRequest } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { Button, Card, Badge, Skeleton, EmptyState, Form, Field, Input, Textarea } from '../../components/ui';
@@ -94,7 +94,8 @@ export default function RequestDetail() {
 
   const isOwner = user?.id === r.studentId;
   const canOffer = user?.role === 'TEACHER' && r.status === 'OPEN' && !r.restricted;
-  const offers = (r.offers ?? []) as Offer[];
+  // الطالب لا يرى إلا العرض الذي اعتمدته الإدارة — لا عروض منافسة ولا ردود داخلية
+  const publishedOffer = r.publishedOffer ?? null;
 
   const submitOffer = async (price: number, message: string, timelineDays?: number) => {
     setSending(true);
@@ -109,10 +110,10 @@ export default function RequestDetail() {
     }
   };
 
-  const accept = async (offerId: string) => {
+  const confirmOffer = async (offerId: string) => {
     setAccepting(offerId);
     try {
-      const { data: order } = await api.requests.acceptOffer(offerId);
+      const { data: order } = await api.requests.confirmOffer(offerId);
       toast.push('success', t('requestDetail.acceptedToast'));
       nav(`/dashboard/orders/${order.id}`);
     } catch (e) {
@@ -160,7 +161,7 @@ export default function RequestDetail() {
                 <Row k={t('requestDetail.budget')} v={r.budget != null ? formatMoney(r.budget) : t('requestDetail.budgetUnset')} />
               )}
               <Row k={t('requestDetail.submittedAt')} v={formatDate(r.createdAt)} />
-              <Row k={t('requestDetail.offersCount')} v={(r.offersCount ?? offers.length).toLocaleString()} />
+              <Row k={t('requestDetail.offersCount')} v={(r.offersCount ?? 0).toLocaleString()} />
               {!r.restricted && r.linkUrl && (
                 <Row
                   k={t('requestDetail.attachmentLink')}
@@ -189,34 +190,33 @@ export default function RequestDetail() {
             )}
           </Card>
 
-          {/* العروض: لصاحب الطلب فقط (والإدارة عبر لوحة الإدارة) */}
+          {/* العرض المعتمد من الإدارة فقط — لا تُعرض العروض الداخلية أو المنافسة */}
           {isOwner && (
             <Card>
               <div className="border-b border-line px-6 py-4">
                 <h2 className="font-bold text-gold-200">{t('requestDetail.offersTitle')}</h2>
               </div>
-              {offers.length === 0 ? (
+              {!publishedOffer ? (
                 <div className="p-6">
                   <EmptyState compact title={t('requestDetail.noOffers')} hint={t('requestDetail.noOffersHint')} />
                 </div>
               ) : (
-                <ul className="divide-y divide-line/60">
-                  {offers.map((o) => (
-                    <li key={o.id} className="flex flex-wrap items-center gap-4 px-6 py-4">
-                      <div className="min-w-40 flex-1">
-                        <p className="font-semibold text-ink-primary">{o.teacher?.fullName ?? t('requestDetail.teacher')}</p>
-                        {o.message && <p className="mt-0.5 text-sm text-ink-secondary">{o.message}</p>}
-                        {o.timelineDays != null && <p className="mt-1 text-xs text-ink-muted">{t('requestDetail.deliveryDays', { days: o.timelineDays })}</p>}
-                      </div>
-                      <Badge tone={o.status === 'ACCEPTED' ? 'ok' : 'gold'}>
-                        {o.status === 'ACCEPTED' ? t('requestDetail.accepted') : t('requestDetail.offerPrice', { price: formatMoney(o.price) })}
-                      </Badge>
-                      {o.status === 'PENDING' && r.status === 'OPEN' && (
-                        <Button size="sm" loading={accepting === o.id} onClick={() => accept(o.id)}>{t('requestDetail.acceptOffer')}</Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <div className="flex flex-wrap items-center gap-4 px-6 py-4">
+                  <div className="min-w-40 flex-1">
+                    <p className="font-semibold text-ink-primary">{publishedOffer.teacherName}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      معتمد من الإدارة · {publishedOffer.timelineDays != null ? t('requestDetail.deliveryDays', { days: publishedOffer.timelineDays }) : '—'}
+                    </p>
+                  </div>
+                  <Badge tone={publishedOffer.status === 'ACCEPTED' ? 'ok' : 'gold'}>
+                    {publishedOffer.status === 'ACCEPTED' ? t('requestDetail.accepted') : formatMoney(publishedOffer.price)}
+                  </Badge>
+                  {publishedOffer.status === 'APPROVED' && (
+                    <Button size="sm" loading={accepting === publishedOffer.id} onClick={() => confirmOffer(publishedOffer.id)}>
+                      {t('requestDetail.acceptOffer')}
+                    </Button>
+                  )}
+                </div>
               )}
             </Card>
           )}
@@ -278,6 +278,7 @@ function OfferForm({ submitting, onSubmit }: { submitting: boolean; onSubmit: (p
   return (
     <Card className="p-6">
       <h3 className="mb-4 font-bold text-gold-200">{t('requestDetail.offerFormTitle')}</h3>
+      <p className="mb-3 text-xs text-ink-muted">العرض موجه للإدارة فقط.</p>
       <Form
         onSubmit={() => {
           const p = Number(price);
@@ -293,7 +294,7 @@ function OfferForm({ submitting, onSubmit }: { submitting: boolean; onSubmit: (p
           <Field label={t('requestDetail.priceLabel')} required error={err ?? undefined} hint={t('requestDetail.priceHint')}>
             <Input type="number" min={5} max={10000} value={price} onChange={(e) => setPrice(e.target.value)} />
           </Field>
-          <Field label={t('requestDetail.messageLabel')}>
+          <Field label="لماذا ترى أنك الأنسب لتنفيذ هذه الخدمة؟" hint="يُوجّه هذا المبرر إلى الإدارة فقط.">
             <Textarea value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={t('requestDetail.messagePlaceholder')} />
           </Field>
           <Field label={t('requestDetail.daysLabel')}>

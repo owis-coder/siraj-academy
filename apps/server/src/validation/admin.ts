@@ -81,13 +81,38 @@ export const adminServiceUpdate = adminServiceCreate.partial();
 // ---------- دورات المدرسين ----------
 
 export const adminOfferingListSchema = paginationSchema.extend({
-  status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "HIDDEN", "REJECTED"]).optional(),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "NEEDS_REVISION", "PUBLISHED", "HIDDEN", "REJECTED"]).optional(),
+  q: z.string().trim().max(200).optional(),
 });
 
 export const adminOfferingUpdate = z.object({
-  status: z.enum(["DRAFT", "PUBLISHED", "HIDDEN", "REJECTED"]),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "NEEDS_REVISION", "PUBLISHED", "HIDDEN", "REJECTED"]),
   adminNote: z.string().trim().max(1000).optional(),
 });
+
+// مراجعة روابط الفيديو على مستوى الدورة والدرس
+export const adminOfferingMediaReview = z
+  .object({
+    trialVideoStatus: z.enum(["PENDING_REVIEW", "APPROVED", "NEEDS_REVISION", "REJECTED"]).optional(),
+    approveAllYoutube: z.boolean().optional(),
+    approvedYoutubeUrls: z.array(z.string().url().max(400)).max(30).optional(),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .strict();
+
+export const adminLessonMediaReview = z
+  .object({
+    reviewStatus: z.enum(["PENDING_REVIEW", "APPROVED", "NEEDS_REVISION", "REJECTED"]),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .strict();
+
+export const adminModerationDecision = z
+  .object({
+    status: z.enum(["APPROVED", "REJECTED"]),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .strict();
 
 // ---------- المدرسون/المستخدمون ----------
 

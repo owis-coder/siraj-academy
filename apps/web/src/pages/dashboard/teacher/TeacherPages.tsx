@@ -139,9 +139,9 @@ export function TeacherOfferings() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-gold-300">{formatMoney(o.price)}</span>
-                  <Badge tone={o.status === 'PUBLISHED' ? 'ok' : o.status === 'DRAFT' ? 'muted' : o.status === 'PENDING_REVIEW' ? 'warn' : o.status === 'HIDDEN' ? 'info' : 'danger'}>{t(OFFERING_STATUS_LABEL[o.status])}</Badge>
+                  <Badge tone={o.status === 'PUBLISHED' ? 'ok' : o.status === 'DRAFT' ? 'muted' : o.status === 'PENDING_REVIEW' || o.status === 'NEEDS_REVISION' ? 'warn' : o.status === 'HIDDEN' ? 'info' : 'danger'}>{t(OFFERING_STATUS_LABEL[o.status])}</Badge>
                   <Button size="sm" variant="subtle" onClick={() => setModal({ open: true, offering: o })}>{t('td.edit')}</Button>
-                  {(o.status === 'DRAFT' || o.status === 'HIDDEN') && (
+                  {(o.status === 'DRAFT' || o.status === 'HIDDEN' || o.status === 'NEEDS_REVISION' || o.status === 'REJECTED') && (
                     <Button size="sm" loading={false} onClick={async () => {
                       try { await api.offerings.submit(o.id); toast.push('success', t('td.sentForReview')); load(); }
                       catch (e) { toast.push('error', e instanceof Error ? e.message : t('td.submitFailed')); }
@@ -304,12 +304,13 @@ function OfferingEditor({ offering, courses, onClose, onSaved }: { offering?: Of
         <Field label={t('td.courseTitle')}>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('td.courseTitlePlaceholder')} />
         </Field>
-        <Field label={t('td.summary')} required>
+        <Field label={t('td.summary')} required hint="يُمنع إدراج وسائل التواصل الخارجية.">
           <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={t('td.summaryPlaceholder')} />
         </Field>
 
         <div>
-          <p className="mb-2 text-sm font-semibold text-gold-200">{t('td.lessons')}</p>
+          <p className="mb-1 text-sm font-semibold text-gold-200">{t('td.lessons')}</p>
+          <p className="mb-2 text-xs text-ink-muted">سيُراجع الرابط ويُعتمد من الإدارة.</p>
           <div className="space-y-3">
             {lessons.map((l, i) => (
               <div key={i} className="grid gap-2 rounded-md border border-line bg-elevated/40 p-3 sm:grid-cols-[1fr_1fr_auto_auto]">
@@ -420,7 +421,7 @@ function OfferModal({ r, onClose, onDone, submit }: { r: ExplainRequest; onClose
         className="space-y-4"
       >
         <Field label={t('td.offerPrice')} required error={err ?? undefined}><Input type="number" min={5} max={10000} value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
-        <Field label={t('td.messageToStudent')}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
+        <Field label="لماذا ترى أنك الأنسب لتنفيذ هذه الخدمة؟" hint="العرض موجه للإدارة فقط."><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
         <Field label={t('td.durationDays')}><Input type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} /></Field>
         <Button type="submit" loading={busy} className="w-full">{t('td.sendOffer')}</Button>
       </Form>

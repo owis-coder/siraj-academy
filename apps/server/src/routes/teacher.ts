@@ -10,6 +10,7 @@ import { requireAuth } from "../middleware/auth";
 import { parseBody } from "../middleware/validate";
 import { asyncHandler } from "../middleware/errorHandler";
 import { UPLOAD_ROOT } from "../middleware/upload";
+import { reviewContent } from "../lib/moderationLog";
 import { docsUrlRule } from "../validation/auth";
 
 const router = Router();
@@ -176,6 +177,19 @@ router.patch(
     if (!profile) throw notFound("ملف المدرس غير موجود");
 
     const { fullName, whatsapp, ...rest } = req.body;
+
+    // ملف المدرس محتوى عام: يُفحص لمنع بيانات التواصل داخل النبذة والتخصصات
+    await reviewContent({
+      entityType: "PROFILE",
+      entityId: profile.id,
+      contentOwnerId: req.user!.id,
+      fields: {
+        bio: rest.bio,
+        specialties: rest.specialties,
+        universitiesText: rest.universitiesText,
+        degree: rest.degree,
+      },
+    });
     // specialties تصل كسطر نصي وتُفصل إلى مصفوفة (فواصل: , أو ،)
     const profileData = {
       ...rest,

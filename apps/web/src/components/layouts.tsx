@@ -90,6 +90,7 @@ const NAVS: Record<Role, NavItem[]> = {
     { to: '/admin/courses', labelKey: 'dash.catalogCourses', icon: IconCourses },
     { to: '/admin/services', labelKey: 'dash.servicesCatalog', icon: IconServices },
     { to: '/admin/offerings', labelKey: 'dash.offeringsReview', icon: IconGraduation },
+    { to: '/admin/review', labelKey: 'dash.reviewCenter', icon: IconAudit },
     { to: '/admin/teachers', labelKey: 'dash.teachers', icon: IconTeachers },
     { to: '/admin/requests', labelKey: 'dash.requests', icon: IconRequests },
     { to: '/admin/custom-requests', labelKey: 'dash.customServices', icon: IconCustomRequests },

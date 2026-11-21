@@ -1,5 +1,7 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma";
+import { reviewContent } from "../lib/moderationLog";
 import { nextOrderNo } from "../lib/orderNo";
 import { notifyUsers, notifyAdmins, adminIds } from "../lib/notify";
 import { sendAdminNotificationEmail } from "../lib/adminNotify";
@@ -36,9 +38,25 @@ router.post(
   parseBody(createRequestSchema),
   asyncHandler(async (req, res) => {
     const data = req.body;
+    const requestId = crypto.randomUUID();
+
+    // فحص محتوى الطلب قبل الحفظ (لا تواصل خارجي ولا بيانات اتصال)
+    await reviewContent({
+      entityType: "EXPLAIN_REQUEST",
+      entityId: requestId,
+      contentOwnerId: req.user!.id,
+      fields: {
+        courseTitle: data.courseTitle,
+        details: data.details,
+        deadline: data.deadline,
+        linkUrl: data.linkUrl,
+        attachments: Array.isArray(data.attachments) ? data.attachments.join(" ") : undefined,
+      },
+    });
 
     const request = await prisma.explainRequest.create({
       data: {
+        id: requestId,
         studentId: req.user!.id,
         universityId: data.universityId,
         collegeId: data.collegeId,
@@ -272,24 +290,48 @@ router.get(
       });
     }
 
-    // العروض: لصاحب الطلب والإدارة فقط (أسعار المدرسين الآخرين ليست عامة)
+    // العروض الداخلية للمدرسين: للإدارة فقط. صاحب الطلب لا يرى سوى العرض المعتمد.
     let offers: unknown = undefined;
-    if (isOwner || isAdmin) {
+    if (isAdmin) {
       offers = await prisma.offer.findMany({
         where: { requestId: request.id },
         include: {
           teacher: { include: { user: { select: { fullName: true, username: true } } } },
         },
-        orderBy: { price: "asc" },
+        orderBy: [{ status: "asc" }, { price: "asc" }],
       });
     }
 
-    const { _count: _c, ...flat } = request;
+    // العرض الوحيد الذي اعتمدته الإدارة ويُعرض على الطالب
+    let publishedOffer: Record<string, unknown> | undefined;
+    if (isOwner || isAdmin) {
+      const approved = await prisma.offer.findFirst({
+        where: { requestId: request.id, status: { in: ["APPROVED", "ACCEPTED"] } },
+        include: { teacher: { include: { user: { select: { fullName: true, username: true } } } } },
+        orderBy: { reviewedAt: "desc" },
+      });
+      if (approved) {
+        publishedOffer = {
+          id: approved.id,
+          price: approved.approvedPrice ?? approved.price,
+          timelineDays: approved.timelineDays ?? null,
+          status: approved.status,
+          teacherName: approved.teacher.user.fullName,
+          teacherUsername: approved.teacher.user.username,
+          approvedByAdmin: true,
+        };
+      }
+    }
+
+    const { _count: _c, student, ...flat } = request;
     res.json({
       data: {
         ...flat,
+        // لا تُكشف هوية الطالب للمدرس — الإدارة هي الوسيط
+        ...(isAdmin || isOwner ? { student } : {}),
         offersCount,
         offers,
+        publishedOffer,
         restricted: false,
         myOfferId: myOffer?.id ?? null,
       },
@@ -315,8 +357,18 @@ router.post(
     });
     if (existing) throw badRequest("لديك عرض مسبق على هذا الطلب؛ عدّله لموقع فقط");
 
+    // مبرر المدرس محتوى موجّه للإدارة — يُفحص ويُمنع فيه أي بيانات تواصل
+    const offerId = crypto.randomUUID();
+    await reviewContent({
+      entityType: "OFFER",
+      entityId: offerId,
+      contentOwnerId: req.user!.id,
+      fields: { message: req.body.message },
+    });
+
     const offer = await prisma.offer.create({
       data: {
+        id: offerId,
         requestId: request.id,
         teacherId: profile.id,
         price: req.body.price,
@@ -326,36 +378,39 @@ router.post(
       },
     });
 
-    await notifyUsers({
-      userIds: [request.studentId],
-      title: "عرض جديد على طلب شرحك",
-      body: `${req.user!.fullName} قدّم عرضًا على طلبك "${request.courseTitle}" بسعر ${req.body.price} ريال.`,
-      link: `/requests/${request.id}`,
+    // العرض يذهب للإدارة فقط — لا إشعار للطالب ولا كشف لبيانات المدرس
+    await notifyAdmins({
+      title: "عرض جديد بانتظار المراجعة",
+      body: `${req.user!.fullName} قدّم عرضًا على «${request.courseTitle}» بسعر ${req.body.price} ريال. راجع المبررات والمرفقات قبل أي قرار.`,
+      link: `/admin/offers?requestId=${request.id}`,
       type: "OFFER_NEW",
-      email: {
-        subject: "عرض جديد على طلب شرحك في أكاديمية سراج",
-        text: `${req.user!.fullName} قدّم عرضًا على طلبك "${request.courseTitle}". سجّل الدخول لعرض التفاصيل.`,
-      },
     });
 
-    res.status(201).json({ data: offer, message: "تم تقديم العرض، وبانتظار موافقة الطالب." });
+    await notifyUsers({
+      userIds: [req.user!.id],
+      title: "وصل عرضك إلى الإدارة",
+      body: "عرضك قيد المراجعة. لا تتواصل مع الطالب مباشرة؛ الإدارة هي الوسيط.",
+      type: "OFFER_SUBMITTED",
+    });
+
+    res.status(201).json({
+      data: offer,
+      message: "تم إرسال عرضك إلى الإدارة للمراجعة. لن يظهر للطالب إلا بعد اعتماد الإدارة.",
+    });
   }),
 );
 
-// عروض الطلب (المالك/الإدارة)
+// عروض الطلب الداخلية: الإدارة فقط. الطالب يرى العرض المعتمد عبر /requests/:id.
 router.get(
   "/:id/offers",
-  requireAuth("STUDENT", "ADMIN"),
+  requireAuth("ADMIN"),
   asyncHandler(async (req, res) => {
     const request = await prisma.explainRequest.findUnique({ where: { id: req.params.id } });
     if (!request) throw notFound("طلب الشرح غير موجود");
-    if (req.user!.role !== "ADMIN" && request.studentId !== req.user!.id) {
-      throw forbidden("عرض العروض متاح لصاحب الطلب والإدارة فقط");
-    }
     const offers = await prisma.offer.findMany({
       where: { requestId: request.id },
       include: { teacher: { include: { user: { select: { fullName: true, username: true } } } } },
-      orderBy: { price: "asc" },
+      orderBy: [{ status: "asc" }, { price: "asc" }],
     });
     res.json({ data: offers, meta: { total: offers.length } });
   }),
@@ -399,7 +454,7 @@ router.post(
     await notifyUsers({
       userIds: [request.studentId],
       title: "لم يُنشر طلب الشرح",
-      body: req.body.reason ? `سبب الإدارة: ${req.body.reason}` : "لم يجتزل طلبك مراجعة الإدارة، راجع قواعد الطلب.",
+      body: req.body.reason ? `سبب الإدارة: ${req.body.reason}` : "لم يجتز طلبك مراجعة الإدارة، راجع قواعد الطلب.",
       type: "REQUEST_REJECTED",
     });
     res.json({ data: updated });
@@ -422,7 +477,7 @@ router.post(
     const updated = await prisma.explainRequest.update({ where: { id: request.id }, data: { status: "CLOSED" } });
     await notifyAdmins({
       title: "أُغلق طلب شرح",
-      body: `أغلق الطالب ${req.user!.fullName} زملاءه الطلب "${request.courseTitle}".`,
+      body: `أُغلق الطلب «${request.courseTitle}».`,
       type: "REQUEST_CLOSED",
     });
     res.json({ data: updated });

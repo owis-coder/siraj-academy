@@ -1,6 +1,9 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import { reviewContent } from "../lib/moderationLog";
+import { ContentModerationService, isYoutubeUrl } from "../lib/contentModeration";
 import { nextOrderNo } from "../lib/orderNo";
 import { notifyUsers, notifyAdmins } from "../lib/notify";
 import { badRequest, conflict, forbidden, notFound, unauthorized } from "../lib/errors";
@@ -18,6 +21,22 @@ import {
 } from "../validation/offerings";
 
 const router = Router();
+
+/** روابط الفيديو المسموحة في المنصة: YouTube فقط */
+function assertYoutubeLinks(urls: Array<string | null | undefined> | undefined | null): void {
+  for (const url of urls ?? []) {
+    if (url && !isYoutubeUrl(url)) {
+      throw badRequest("روابط الفيديو يجب أن تكون روابط YouTube صحيحة فقط (YouTube links only).");
+    }
+  }
+}
+
+/** الحقول الحساسة التي تُعيد الدورة المنشورة إلى المراجعة عند تعديلها */
+function hasSensitiveChange(data: Record<string, unknown>): boolean {
+  return ["title", "summary", "price", "trialVideoUrl", "youtubeUrls", "courseId", "courseTitle"].some(
+    (k) => data[k] !== undefined,
+  );
+}
 
 // حقل ت‘ربط الحقوق: جلب offering مع تحقق الملكية
 async function getOwnedOffering(offeringId: string, userId: string, isAdmin = false) {
@@ -51,6 +70,21 @@ router.post(
     const profile = await prisma.teacherProfile.findUnique({ where: { userId: req.user!.id } });
     if (!profile) throw notFound("ملف المدرس غير موجود");
 
+    assertYoutubeLinks([data.trialVideoUrl, ...(data.youtubeUrls ?? [])]);
+    const offeringId = crypto.randomUUID();
+    await reviewContent({
+      entityType: "OFFERING",
+      entityId: offeringId,
+      contentOwnerId: req.user!.id,
+      fields: {
+        title: data.title,
+        courseTitle: data.courseTitle,
+        summary: data.summary,
+        trialVideoUrl: data.trialVideoUrl,
+        youtubeUrls: (data.youtubeUrls ?? []).join(" "),
+      },
+    });
+
     let course;
     if (data.courseId) {
       course = await prisma.course.findUnique({ where: { id: data.courseId } });
@@ -78,13 +112,17 @@ router.post(
 
     const offering = await prisma.courseOffering.create({
       data: {
+        id: offeringId,
         courseId: course.id,
         teacherId: profile.id,
         title: data.title,
         summary: data.summary,
         price: data.price,
         trialVideoUrl: data.trialVideoUrl,
+        trialVideoStatus: data.trialVideoUrl ? "PENDING_REVIEW" : "APPROVED",
         youtubeUrls: data.youtubeUrls ?? undefined,
+        // لا يُعرض أي رابط للطلاب قبل اعتماد الإدارة
+        approvedYoutubeUrls: undefined,
         accessType: data.price === 0 ? "TRIAL" : "PAID",
         status: "DRAFT",
       },
@@ -93,7 +131,7 @@ router.post(
 
     res.status(201).json({
       data: offering,
-      message: "أُنشئت الدورة كمسودة؛ أضف الدروس ثم اجعله منشورًا عند اكتمال المحتوى.",
+      message: "أُنشئت الدورة كمسودة؛ أضف الدروس ثم قدّمها لمراجعة الإدارة. روابط الفيديو تُعتمد قبل الظهور.",
     });
   }),
 );
@@ -141,14 +179,41 @@ router.post(
     const offering = await getOwnedOffering(req.params.id, req.user!.id);
     if (offering.status === "PENDING_REVIEW") throw badRequest("الدورة قيد المراجعة مسبقًا");
     if (offering.status === "PUBLISHED") throw badRequest("الدورة منشورة مسبقًا");
-    if (offering.status === "REJECTED") throw badRequest("الدورة مرفوضة من الإدارة؛ عدّلها ثم أعد تقديمها");
+    // يمكن إعادة تقديم المسودة والمخفية والمرفوضة والتي تحتاج تعديلًا
+    if (!["DRAFT", "HIDDEN", "REJECTED", "NEEDS_REVISION"].includes(offering.status)) {
+      throw badRequest("لا يمكن تقديم الدورة في حالتها الحالية؛ راجع الإدارة");
+    }
 
     const lessonsCount = await prisma.lesson.count({ where: { offeringId: offering.id } });
     if (lessonsCount === 0) throw badRequest("لا يمكن تقديم دورة بلا دروس؛ أضف درسًا واحدًا على الأقل");
 
+    // إعادة فحص محتوى الدورة ودروسها قبل وصولها للمراجعة
+    const lessons = await prisma.lesson.findMany({
+      where: { offeringId: offering.id },
+      select: { title: true, videoUrl: true },
+    });
+    await reviewContent({
+      entityType: "OFFERING",
+      entityId: offering.id,
+      contentOwnerId: req.user!.id,
+      fields: {
+        title: offering.title ?? undefined,
+        summary: offering.summary,
+        trialVideoUrl: offering.trialVideoUrl ?? undefined,
+        youtubeUrls: JSON.stringify(offering.youtubeUrls ?? []),
+        lessons: lessons.map((l) => `${l.title} ${l.videoUrl}`).join("\n"),
+      },
+    });
+
     const updated = await prisma.courseOffering.update({
       where: { id: offering.id },
-      data: { status: "PENDING_REVIEW" },
+      data: {
+        status: "PENDING_REVIEW",
+        // أي فيديو لم يُعتمد بعد يحتاج اعتمادًا جديدًا
+        ...(offering.trialVideoUrl && offering.trialVideoStatus !== "APPROVED"
+          ? { trialVideoStatus: "PENDING_REVIEW" as const }
+          : {}),
+      },
     });
 
     await notifyAdmins({
@@ -192,6 +257,41 @@ router.patch(
       throw badRequest("نشر الدورة قرار إداري؛ قدّم الدورة للمراجعة عبر /offerings/:id/submit");
     }
 
+    assertYoutubeLinks([data.trialVideoUrl, ...(data.youtubeUrls ?? [])]);
+    await reviewContent({
+      entityType: "OFFERING",
+      entityId: offering.id,
+      contentOwnerId: req.user!.id,
+      fields: {
+        title: data.title,
+        courseTitle: data.courseTitle,
+        summary: data.summary,
+        trialVideoUrl: data.trialVideoUrl ?? undefined,
+        youtubeUrls: (data.youtubeUrls ?? []).join(" "),
+      },
+    });
+
+    // تعديل جوهري على دورة منشورة من المدرس يعيدها للمراجعة (سياسة المنصة)
+    const mustReReview = !isAdmin && offering.status === "PUBLISHED" && hasSensitiveChange(data);
+    const teacherStatus = mustReReview ? ("PENDING_REVIEW" as const) : data.status;
+    if (!isAdmin && teacherStatus === "PUBLISHED") {
+      throw badRequest("نشر الدورة قرار إداري فقط");
+    }
+
+    // روابط YouTube الجديدة تحتاج اعتمادًا جديدًا؛ نحتفظ بالمعتمد فقط من القائمة الجديدة
+    let approvedYoutubeUrls: Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined;
+    if (data.youtubeUrls !== undefined) {
+      if (data.youtubeUrls === null) {
+        approvedYoutubeUrls = Prisma.JsonNull;
+      } else {
+        const previous = Array.isArray(offering.approvedYoutubeUrls)
+          ? (offering.approvedYoutubeUrls as string[])
+          : [];
+        const stillApproved = data.youtubeUrls.filter((u) => previous.includes(u));
+        approvedYoutubeUrls = stillApproved as Prisma.InputJsonValue;
+      }
+    }
+
     let newCourseId: string | undefined;
     if (data.courseId) {
       const c = await prisma.course.findUnique({ where: { id: data.courseId } });
@@ -227,11 +327,18 @@ router.patch(
         ...(data.price !== undefined
           ? { price: data.price, accessType: (data.price === 0 ? "TRIAL" : "PAID") as never }
           : {}),
-        ...(data.trialVideoUrl !== undefined ? { trialVideoUrl: data.trialVideoUrl } : {}),
+        ...(data.trialVideoUrl !== undefined
+          ? {
+              trialVideoUrl: data.trialVideoUrl,
+              // أي تعديل على الفيديو الترويجي يعيده لمراجعة الإدارة
+              trialVideoStatus: (data.trialVideoUrl ? "PENDING_REVIEW" : "APPROVED") as never,
+            }
+          : {}),
         ...(data.youtubeUrls !== undefined
           ? { youtubeUrls: (data.youtubeUrls === null ? Prisma.JsonNull : data.youtubeUrls) as Prisma.InputJsonValue }
           : {}),
-        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(approvedYoutubeUrls !== undefined ? { approvedYoutubeUrls } : {}),
+        ...(teacherStatus !== undefined ? { status: teacherStatus } : {}),
       },
       include: { course: { select: { title: true } } },
     });
@@ -250,10 +357,28 @@ router.post(
     const { title, videoUrl, access, order } = req.body as {
       title: string; videoUrl: string; access: "TRIAL" | "PAID"; order: number;
     };
-    const lesson = await prisma.lesson.create({
-      data: { offeringId: offering.id, title, videoUrl, access, order },
+    assertYoutubeLinks([videoUrl]);
+    await reviewContent({
+      entityType: "LESSON",
+      entityId: offering.id,
+      contentOwnerId: req.user!.id,
+      fields: { title, videoUrl },
     });
-    res.status(201).json({ data: lesson });
+    const lesson = await prisma.lesson.create({
+      data: {
+        offeringId: offering.id,
+        title,
+        videoUrl,
+        access,
+        order,
+        // رابط الدرس لا يُعرض للطلاب قبل اعتماد الإدارة
+        reviewStatus: "PENDING_REVIEW",
+      },
+    });
+    if (offering.status === "PUBLISHED") {
+      await prisma.courseOffering.update({ where: { id: offering.id }, data: { status: "PENDING_REVIEW" } });
+    }
+    res.status(201).json({ data: lesson, message: "أُضيف الدرس، وسيُعتمد رابطه قبل ظهوره للطلاب." });
   }),
 );
 
@@ -269,6 +394,14 @@ router.patch(
     const { title, videoUrl, access, order } = req.body as {
       title?: string; videoUrl?: string; access?: string; order?: number;
     };
+    if (videoUrl !== undefined) assertYoutubeLinks([videoUrl]);
+    await reviewContent({
+      entityType: "LESSON",
+      entityId: lesson.id,
+      contentOwnerId: req.user!.id,
+      fields: { title, videoUrl },
+    });
+    const mediaChanged = title !== undefined || videoUrl !== undefined;
     const updated = await prisma.lesson.update({
       where: { id: lesson.id },
       data: {
@@ -276,9 +409,17 @@ router.patch(
         ...(videoUrl !== undefined ? { videoUrl } : {}),
         ...(access !== undefined ? { access: access as "TRIAL" | "PAID" } : {}),
         ...(order !== undefined ? { order } : {}),
+        // أي تعديل على عنوان/رابط الدرس يحتاج اعتمادًا جديدًا
+        ...(mediaChanged ? { reviewStatus: "PENDING_REVIEW" as const } : {}),
       },
     });
-    res.json({ data: updated });
+    if (mediaChanged && lesson.offering.status === "PUBLISHED") {
+      await prisma.courseOffering.update({
+        where: { id: lesson.offeringId },
+        data: { status: "PENDING_REVIEW" },
+      });
+    }
+    res.json({ data: updated, message: mediaChanged ? "حُفظ الدرس، ويحتاج اعتماد الإدارة قبل الظهور." : undefined });
   }),
 );
 
@@ -348,13 +489,24 @@ router.get(
         })
       : [];
 
+    // الزائر/الطالب غير المشترك: ما اعتمدته الإدارة فقط (لا روابط قيد المراجعة)
+    const visibleLessons = seeAll
+      ? offering.lessons
+      : offering.lessons
+          .filter((l) => l.access === "TRIAL")
+          .map((l) => ({ ...l, videoUrl: l.reviewStatus === "APPROVED" ? l.videoUrl : "" }));
+
     res.json({
       data: {
         ...offering,
+        // لا نُسرّب ملاحظات الإدارة أو المدخلات غير المعتمدة
+        adminNote: req.user?.role === "ADMIN" ? offering.adminNote : undefined,
+        trialVideoUrl: seeAll || offering.trialVideoStatus === "APPROVED" ? offering.trialVideoUrl : null,
+        youtubeUrls: seeAll ? offering.youtubeUrls : offering.approvedYoutubeUrls,
         teacherUsername: offering.teacher.user.username,
         teacherName: offering.teacher.user.fullName,
         canSeeAllLessons: seeAll,
-        lessons: seeAll ? offering.lessons : offering.lessons.filter((l) => l.access === "TRIAL"),
+        lessons: visibleLessons,
         reviews,
       },
     });
@@ -369,7 +521,8 @@ router.get(
     const offering = await getOwnedOffering(req.params.id, req.user!.id, req.user!.role === "ADMIN");
     const enrollments = await prisma.enrollment.findMany({
       where: { offeringId: offering.id },
-      include: { user: { select: { id: true, fullName: true, username: true, whatsapp: true, university: { select: { name: true } } } } },
+      // المدرس لا يرى بيانات اتصال الطلاب (لا واتساب ولا بريد) — الإدارة هي الوسيط
+      include: { user: { select: { id: true, fullName: true, username: true, university: { select: { name: true } } } } },
       orderBy: { createdAt: "desc" },
     });
     res.json({ data: enrollments, meta: { total: enrollments.length } });

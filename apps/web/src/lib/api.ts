@@ -289,8 +289,11 @@ export interface Offering {
   price: number;
   trialVideoUrl?: string | null;
   accessType?: 'TRIAL' | 'PAID';
-  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'HIDDEN' | 'REJECTED';
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'NEEDS_REVISION' | 'PUBLISHED' | 'HIDDEN' | 'REJECTED';
   adminNote?: string | null;
+  youtubeUrls?: string[] | null;
+  approvedYoutubeUrls?: string[] | null;
+  trialVideoStatus?: 'PENDING_REVIEW' | 'APPROVED' | 'NEEDS_REVISION' | 'REJECTED';
   teacher?: User & { teacherProfile?: TeacherProfile | null };
   teacherName?: string;
   teacherUsername?: string;
@@ -439,6 +442,8 @@ export interface ExplainRequest {
   student?: Pick<User, 'id' | 'fullName' | 'username' | 'whatsapp'>;
   offersCount?: number;
   offers?: Offer[];
+  /** العرض الوحيد الذي اعتمدته الإدارة ويُعرض على الطالب */
+  publishedOffer?: PublishedOffer | null;
   /** true عندما تكون بيانات الطلب محدودة لأن المستخدم ليس مالكه ولا مدرّسًا معتمدًا */
   restricted?: boolean;
   myOfferId?: string | null;
@@ -451,9 +456,21 @@ export interface Offer {
   price: number;
   message?: string | null;
   timelineDays?: number | null;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'NEEDS_REVISION' | 'ACCEPTED' | 'REJECTED';
+  approvedPrice?: number | null;
+  adminNote?: string | null;
   teacher?: User & { teacherProfile?: TeacherProfile | null };
   createdAt?: string;
+}
+
+export interface PublishedOffer {
+  id: string;
+  price: number;
+  timelineDays?: number | null;
+  status: 'APPROVED' | 'ACCEPTED';
+  teacherName: string;
+  teacherUsername?: string;
+  approvedByAdmin: true;
 }
 
 export type OrderStatus = 'AWAITING_PAYMENT' | 'AWAITING_REVIEW' | 'REJECTED' | 'PAID' | 'CANCELLED';
@@ -492,6 +509,10 @@ export interface ChatRoom {
   unreadCount?: number;
   unread?: number;
   isSupport?: boolean;
+  /** غرفة قديمة بين طالب ومدرس أُوقف إرسال الرسائل فيها — قراءة فقط */
+  readOnly?: boolean;
+  /** هل الغرفة تمر عبر الإدارة؟ */
+  mediated?: boolean;
   participants?: User[];
   lastMessage?: { body: string | null; createdAt?: string; at?: string; sender?: string; senderId?: string } | null;
 }
@@ -835,8 +856,14 @@ export const api = {
     create: (body: Record<string, unknown>) => request<ExplainRequest>('/requests', { method: 'POST', body }),
     offers: (id: string) => request<Offer[]>(`/requests/${id}/offers`),
     createOffer: (id: string, body: { price: number; message?: string; timelineDays?: number }) => request<Offer>(`/requests/${id}/offers`, { method: 'POST', body }),
+    /** تأكيد العرض المعتمد الوحيد الذي أرسلته الإدارة (الطالب) */
+    confirmOffer: async (offerId: string) => {
+      const res = await request<{ order?: Order } & Order>(`/offers/${offerId}/confirm`, { method: 'POST' });
+      const order = (res.data?.order ?? res.data) as Order;
+      return { data: order, meta: res.meta };
+    },
     acceptOffer: async (offerId: string) => {
-      const res = await request<{ order?: Order } & Order>(`/offers/${offerId}/accept`, { method: 'POST' });
+      const res = await request<{ order?: Order } & Order>(`/offers/${offerId}/confirm`, { method: 'POST' });
       const order = (res.data?.order ?? res.data) as Order;
       return { data: order, meta: res.meta };
     },
@@ -990,6 +1017,25 @@ export const api = {
       teacherEnable: (id: string) => request(`/admin/teachers/${id}/enable`, { method: 'POST' }),
       requestPublish: (id: string) => request(`/requests/${id}/publish`, { method: 'POST' }),
       requestReject: (id: string, reason?: string) => request(`/requests/${id}/reject`, { method: 'POST', body: { reason } }),
+      reviewQueue: () =>
+        request<{ pendingOfferings: number; needsRevisionOfferings: number; pendingLessons: number; pendingAds: number; moderationOpen: number }>(
+          '/admin/review-queue',
+        ),
+      moderation: (query?: { status?: string; page?: number; limit?: number }) =>
+        request<Record<string, unknown>[]>('/admin/moderation', { query }),
+      moderationDecision: (id: string, body: { status: 'APPROVED' | 'REJECTED'; note?: string }) =>
+        request(`/admin/moderation/${id}`, { method: 'PATCH', body }),
+      offers: (requestId?: string) => request<Offer[]>('/offers', { query: { requestId } }),
+      offerApprove: (id: string, body: { approvedPrice?: number; adminNote?: string }) =>
+        request<Offer>(`/offers/${id}/approve`, { method: 'POST', body }),
+      offerRequestChanges: (id: string, note: string) =>
+        request<Offer>(`/offers/${id}/request-changes`, { method: 'POST', body: { note } }),
+      offerReject: (id: string, note?: string) =>
+        request<Offer>(`/offers/${id}/reject`, { method: 'POST', body: { note } }),
+      offeringMedia: (id: string, body: Record<string, unknown>) =>
+        request<Offering>(`/admin/offerings/${id}/media`, { method: 'PATCH', body }),
+      lessonMedia: (id: string, body: { reviewStatus: string; note?: string }) =>
+        request(`/admin/lessons/${id}/media`, { method: 'PATCH', body }),
       paymentReview: (paymentId: string, body: { decision: 'APPROVED' | 'REJECTED'; note?: string }) =>
         request(`/payments/${paymentId}/review`, { method: 'POST', body }),
       adDecision: (id: string, body: { decision: string; note?: string }) => request(`/ads/${id}/admin`, { method: 'POST', body }),

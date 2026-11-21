@@ -7,8 +7,19 @@ import { parseBody, parseQuery } from "../middleware/validate";
 import { asyncHandler } from "../middleware/errorHandler";
 import { createRoomSchema, messageListSchema, sendMessageSchema, reportRoomSchema } from "../validation/chat";
 import { getOrCreateSupportUser, ensureUserSupportRoom, SUPPORT_FULL_NAME } from "../lib/supportChat";
+import { ContentModerationService } from "../lib/contentModeration";
 
 const router = Router();
+
+/**
+ * نموذج التواصل المركزي:
+ *   الطالب ← الإدارة ← المدرس
+ * لا تُنشأ غرف مباشرة بين طالب ومدرس، ولا تُقبل رسائل في غرفة قديمة
+ * تضم طالبًا ومدرسًا بلا إدارة. تبقى الرسائل التاريخية مقروءة فقط.
+ */
+
+const MEDIATION_REQUIRED_MESSAGE =
+  "في منصة سراج لا يوجد تواصل مباشر بين الطالب والمدرس. تواصل مع الإدارة من قسم المحادثات.";
 
 async function getMembership(roomId: string, userId: string, role?: string) {
   const participant = await prisma.chatParticipant.findUnique({
@@ -23,7 +34,24 @@ async function getMembership(roomId: string, userId: string, role?: string) {
   return participant;
 }
 
-// ---------- غرفّي ----------
+/** هل الغرفة تضم إدارة؟ أي تواصل غير إداري يجب أن يمر عبرها. */
+async function roomHasAdmin(roomId: string): Promise<boolean> {
+  const admin = await prisma.chatParticipant.findFirst({
+    where: { roomId, user: { role: "ADMIN" } },
+    select: { id: true },
+  });
+  return Boolean(admin);
+}
+
+async function roomRoles(roomId: string): Promise<string[]> {
+  const rows = await prisma.chatParticipant.findMany({
+    where: { roomId },
+    select: { user: { select: { role: true } } },
+  });
+  return rows.map((r) => r.user.role);
+}
+
+// ---------- غرفي ----------
 router.get(
   "/rooms",
   requireAuth(),
@@ -45,7 +73,6 @@ router.get(
     let roomEntries: { room: any; lastReadAt: Date | null }[] = [];
 
     if (isAdmin) {
-      // للأدمن: جلب كافة محادثات الدعم الفني مع جميع الطلاب والمدرسين + أي محادثة يشارك بها الأدمن
       const allRooms = (await prisma.chatRoom.findMany({
         where: {
           OR: [
@@ -100,10 +127,9 @@ router.get(
           },
         });
         const isSupport = Boolean(supportId && room.participants.some((x: any) => x.user.id === supportId));
+        const hasAdmin = room.participants.some((x: any) => x.user.role === "ADMIN");
+        const isLegacyDirect = !hasAdmin;
 
-        // تحديد عنوان المحادثة:
-        // إذا كان المستخدم طالب أو مدرس: يظهر عنوان "الدعم الفني — أكاديمية سراج"
-        // إذا كان المستخدم أدمن: يظهر اسم الطالب أو المدرس المستفسر بوضوح!
         let title = room.title;
         const peer =
           room.participants.find((x: any) => x.user.id !== req.user!.id && x.user.role !== "ADMIN") ??
@@ -127,6 +153,9 @@ router.get(
           orderId: room.orderId,
           myLastReadAt: lastReadAt,
           isSupport,
+          // غرف قديمة بلا إدارة: للقراءة فقط (يُحفظ السجل ولا يُحذف)
+          readOnly: !isAdmin && isLegacyDirect,
+          mediated: hasAdmin,
           participants: room.participants.map((x: any) => ({
             id: x.user.id,
             userId: x.user.id,
@@ -142,7 +171,6 @@ router.get(
       }),
     );
 
-    // ترتيب المحادثات: وضع محادثات الدعم الفني غير المقروءة أولاً للأدمن
     rooms.sort((a, b) => {
       if (isAdmin) {
         if (a.unread > 0 && b.unread === 0) return -1;
@@ -159,6 +187,8 @@ router.get(
 );
 
 // ---------- إنشاء غرفة ----------
+// المستخدم العادي لا يستطيع إنشاء غرفة إلا مع الإدارة (الدعم الفني).
+// الإدارة وحدها تنشئ المجموعات وتفتح القنوات.
 router.post(
   "/rooms",
   requireAuth("STUDENT", "TEACHER", "ADMIN"),
@@ -168,8 +198,12 @@ router.post(
 
     if (peerId) {
       if (peerId === req.user!.id) throw badRequest("لا يمكنك محادثة نفسك");
-      const peer = await prisma.user.findUnique({ where: { id: peerId }, select: { id: true, status: true } });
+      const peer = await prisma.user.findUnique({ where: { id: peerId }, select: { id: true, status: true, role: true } });
       if (!peer || peer.status === "SUSPENDED") throw notFound("المستخدم غير موجود");
+
+      if (req.user!.role !== "ADMIN" && peer.role !== "ADMIN") {
+        throw forbidden(MEDIATION_REQUIRED_MESSAGE);
+      }
 
       // منع الازدواج: بحث غرفة مباشرة بين الطرفين
       const myDirects = await prisma.chatParticipant.findMany({
@@ -177,9 +211,7 @@ router.post(
         include: { room: { include: { participants: { select: { userId: true } } } } },
       });
       const found = myDirects.find(
-        (p) =>
-          p.room.participants.length === 2 &&
-          p.room.participants.some((x) => x.userId === peerId),
+        (p) => p.room.participants.length === 2 && p.room.participants.some((x) => x.userId === peerId),
       );
       if (found) return res.json({ data: { roomId: found.roomId, reused: true } });
 
@@ -194,8 +226,9 @@ router.post(
       return;
     }
 
-    // مجموعة: للإدارة أو المدرس
-    if (req.user!.role === "STUDENT") throw forbidden("إنشاء المجموعات للإدارة والمدرسين");
+    if (req.user!.role !== "ADMIN") {
+      throw forbidden("إنشاء المحادثات الجماعية متاح للإدارة فقط");
+    }
     const room = await prisma.chatRoom.create({
       data: {
         type: "GROUP",
@@ -227,13 +260,12 @@ router.get(
       take: limit,
       include: { sender: { select: { id: true, fullName: true, username: true, role: true } } },
     });
-    // ترتيب زمني تصاعدي للعرض
     messages.reverse();
     res.json({ data: messages, meta: { count: messages.length, hasMore: messages.length === limit } });
   }),
 );
 
-// إرسال رسالة عبر REST (أو عبر Socket — انظر server.ts)
+// إرسال رسالة عبر REST أو Socket
 router.post(
   "/rooms/:id/messages",
   requireAuth(),
@@ -242,6 +274,49 @@ router.post(
     const roomId = req.params.id;
     await getMembership(roomId, req.user!.id, req.user!.role);
     const { body, attachmentUrl } = req.body as { body?: string; attachmentUrl?: string };
+    const isAdmin = req.user!.role === "ADMIN";
+
+    // ---------- فرض الوساطة: لا تواصل مباشر بين طالب ومدرس ----------
+    if (!isAdmin) {
+      const hasAdmin = await roomHasAdmin(roomId);
+      if (!hasAdmin) {
+        const roles = await roomRoles(roomId);
+        const hasStudent = roles.includes("STUDENT");
+        const hasTeacher = roles.includes("TEACHER");
+        if (hasStudent && hasTeacher) {
+          throw forbidden(
+            "هذه محادثة قديمة بين طالب ومدرس. أُوقف المسار المباشر، والسجل متاح للقراءة فقط. تواصل مع الإدارة.",
+          );
+        }
+        throw forbidden(MEDIATION_REQUIRED_MESSAGE);
+      }
+    }
+
+    // ---------- فحص محتوى الرسالة ----------
+    if (!isAdmin) {
+      const contentResult = ContentModerationService.moderateText(body ?? "");
+      if (contentResult.status !== "APPROVED") {
+        await prisma.contentModerationLog
+          .create({
+            data: {
+              entityType: "MESSAGE",
+              entityId: roomId,
+              field: "body",
+              status: contentResult.status,
+              reasons: contentResult.reasons as unknown as object,
+              snippet: contentResult.snippet ?? null,
+              contentOwnerId: req.user!.id,
+            },
+          })
+          .catch(() => undefined);
+        throw badRequest(
+          `${ContentModerationService.moderationUserMessage(contentResult)} لا يمكن تبادل بيانات الاتصال داخل المحادثة؛ الإدارة هي الوسيط.`,
+        );
+      }
+      if (attachmentUrl && !attachmentUrl.startsWith("/uploads/")) {
+        throw badRequest("المرفقات يجب أن تكون ملفات مرفوعة على المنصة فقط");
+      }
+    }
 
     // منع الرسائل إن حُظر أحد الطرفين الآخر في محادثة مباشرة
     const room = await prisma.chatRoom.findUnique({
@@ -251,7 +326,12 @@ router.post(
     if (room && room.type === "DIRECT") {
       const peerIds = room.participants.map((p) => p.userId).filter((id) => id !== req.user!.id);
       const blockRow = await prisma.block.findFirst({
-        where: { OR: [{ blockerId: req.user!.id, blockedId: { in: peerIds } }, { blockedId: req.user!.id, blockerId: { in: peerIds } }] },
+        where: {
+          OR: [
+            { blockerId: req.user!.id, blockedId: { in: peerIds } },
+            { blockedId: req.user!.id, blockerId: { in: peerIds } },
+          ],
+        },
       });
       if (blockRow) throw badRequest("محادثة محظورة بينكما حاليًا");
     }
@@ -278,7 +358,12 @@ router.post(
     await prisma.chatParticipant.upsert({
       where: { roomId_userId: { roomId: req.params.id, userId: req.user!.id } },
       update: { lastReadAt: at },
-      create: { roomId: req.params.id, userId: req.user!.id, role: req.user!.role === "ADMIN" ? "ADMIN" : "MEMBER", lastReadAt: at },
+      create: {
+        roomId: req.params.id,
+        userId: req.user!.id,
+        role: req.user!.role === "ADMIN" ? "ADMIN" : "MEMBER",
+        lastReadAt: at,
+      },
     });
     const io = getIO();
     if (io) io.to(`room:${req.params.id}`).emit("message:read", { roomId: req.params.id, userId: req.user!.id, at: at.toISOString() });
@@ -286,8 +371,7 @@ router.post(
   }),
 );
 
-// ----------
-// بلاغ محادثة (يراقبه /admin/chat/reports)
+// ---------- بلاغ محادثة ----------
 router.post(
   "/rooms/:id/report",
   requireAuth(),
@@ -296,13 +380,18 @@ router.post(
     const roomId = req.params.id;
     await getMembership(roomId, req.user!.id);
     const report = await prisma.chatReport.create({
-      data: { roomId, reporterId: req.user!.id, reason: (req.body as { reason: string }).reason, messageId: (req.body as { messageId?: string }).messageId },
+      data: {
+        roomId,
+        reporterId: req.user!.id,
+        reason: (req.body as { reason: string }).reason,
+        messageId: (req.body as { messageId?: string }).messageId,
+      },
     });
     res.status(201).json({ data: report, message: "تم إرسال البلاغ للإدارة" });
   }),
 );
 
-// ---------- حظر/رفع الحظر بين المستخدمين ----------
+// ---------- حظر/رفع الحظر ----------
 router.post(
   "/users/:id/block",
   requireAuth(),

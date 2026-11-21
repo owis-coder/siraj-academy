@@ -56,6 +56,7 @@ import {
   AdminMajors,
   AdminCourses,
   AdminOfferings,
+  AdminModeration,
   AdminTeachers,
   AdminRequests,
   AdminCustomRequests,
@@ -243,6 +244,7 @@ export default function App() {
               <Route path="services" element={<AdminCrud cfg={SERVICES_CFG} />} />
               <Route path="courses" element={<AdminCourses />} />
               <Route path="offerings" element={<AdminOfferings />} />
+              <Route path="review" element={<AdminModeration />} />
               <Route path="teachers" element={<AdminTeachers />} />
               <Route path="requests" element={<AdminRequests />} />
               <Route path="custom-requests" element={<AdminCustomRequests />} />

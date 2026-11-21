@@ -7,6 +7,7 @@ import { parseBody, parseQuery } from "../middleware/validate";
 import { asyncHandler } from "../middleware/errorHandler";
 import { pageMeta, skipTake, paginationSchema } from "../validation/common";
 import { createAdSchema, updateAdSchema, adDecisionSchema } from "../validation/ads";
+import { reviewContent } from "../lib/moderationLog";
 import type { AdStatus } from "@prisma/client";
 
 const router = Router();
@@ -30,6 +31,12 @@ router.post(
   asyncHandler(async (req, res) => {
     const profile = await prisma.teacherProfile.findUnique({ where: { userId: req.user!.id } });
     if (!profile) throw notFound("ملف المدرس غير موجود");
+
+    await reviewContent({
+      entityType: "AD",
+      contentOwnerId: req.user!.id,
+      fields: { title: req.body.title, body: req.body.body, linkUrl: req.body.linkUrl },
+    });
 
     const ad = await prisma.ad.create({
       data: {
@@ -82,6 +89,12 @@ router.patch(
     }
 
     const data = req.body as { title?: string; body?: string; imageUrl?: string; linkUrl?: string };
+    await reviewContent({
+      entityType: "AD",
+      entityId: ad.id,
+      contentOwnerId: req.user!.id,
+      fields: { title: data.title, body: data.body, linkUrl: data.linkUrl },
+    });
     const wasApproved = ad.status === "APPROVED";
 
     const updated = await prisma.ad.update({

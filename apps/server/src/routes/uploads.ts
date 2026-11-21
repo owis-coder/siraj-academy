@@ -1,8 +1,10 @@
 import { Router } from "express";
+import fs from "fs";
 import { multerSingle, uploadAny } from "../middleware/upload";
 import { requireAuth } from "../middleware/auth";
 import { badRequest } from "../lib/errors";
 import { asyncHandler } from "../middleware/errorHandler";
+import { assertSafeFileName } from "../lib/moderationLog";
 
 const router = Router();
 
@@ -15,6 +17,19 @@ router.post(
   multerSingle("file", uploadAny),
   asyncHandler(async (req, res) => {
     if (!req.file) throw badRequest("أرفق ملفًا في الحقل file");
+
+    // فحص اسم الملف: قد يحمل رقم تواصل أو دعوة للتواصل خارج المنصة
+    try {
+      await assertSafeFileName(req.file.originalname, req.user!.id);
+    } catch (err) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        /* الملف قد يكون محذوفًا مسبقًا */
+      }
+      throw err;
+    }
+
     res.status(201).json({
       data: {
         url: `/uploads/${req.file.filename}`,

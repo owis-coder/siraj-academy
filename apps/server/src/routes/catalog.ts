@@ -262,12 +262,12 @@ router.get(
     );
 
     const offerings = offeringsRaw.map((o) => {
-      // يرى الزائر والطالب غير المشترك عناوين وترتيب وقفل كافة الدروس، مع حجب روابط الفيديو المدفوعة
+      // يرى الزائر والطالب غير المشترك عناوين وترتيب وقفل كافة الدروس،
+      // ولا يُعرض أي رابط فيديو قبل اعتماد الإدارة.
       const seeAll = accessByOffering.get(o.id) === true;
       const lessons = o.lessons.map((l) => {
-        if (seeAll || l.access === "TRIAL") {
-          return l;
-        }
+        if (seeAll) return l;
+        if (l.access === "TRIAL" && l.reviewStatus === "APPROVED") return l;
         return {
           ...l,
           videoUrl: "",
@@ -279,8 +279,8 @@ router.get(
         summary: o.summary,
         price: o.price,
         accessType: o.accessType,
-        trialVideoUrl: o.trialVideoUrl,
-        youtubeUrls: o.youtubeUrls,
+        trialVideoUrl: seeAll || o.trialVideoStatus === "APPROVED" ? o.trialVideoUrl : null,
+        youtubeUrls: seeAll ? o.youtubeUrls : o.approvedYoutubeUrls,
         createdAt: o.createdAt,
         teacherName: o.teacher.user.fullName,
         teacherUsername: o.teacher.user.username,
@@ -469,13 +469,10 @@ router.post(
     const { nextOrderNo } = await import("../lib/orderNo");
     const orderNo = await nextOrderNo();
 
-    // إن حدد الطالب مدرسًا (خصّص) نثبت المزوّد في الطلب
-    let providerIdToUse = service.providerId ?? null;
-    if (providerId) {
-      const provider = await prisma.teacherProfile.findUnique({ where: { id: providerId }, select: { id: true } });
-      if (!provider) throw notFound("المدرس المحدد غير موجود");
-      providerIdToUse = providerId;
-    }
+    // لا يختار الطالب المدرس مباشرة: الإدارة هي من تعيّن مزوّد الخدمة.
+    // يُتجاهل providerId القادم من العميل، ويُعتمد ما حددته الإدارة على الخدمة فقط.
+    void providerId;
+    const providerIdToUse = service.providerId ?? null;
 
     const order = await prisma.order.create({
       data: {
