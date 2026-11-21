@@ -139,6 +139,7 @@ function RequestsRow({ r }: { r: ExplainRequest }) {
 
 /* ================= المحادثات ================= */
 export function ChatPage() {
+  const { user } = useAuth();
   const { t } = useI18n();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export function ChatPage() {
 
   useEffect(() => {
     api.chat.rooms().then(({ data }) => {
-      const rs = data ?? [];
+      const rs = (data ?? []) as ChatRoom[];
       setRooms(rs);
       setActive((a) => a ?? rs[0]?.id ?? null);
       setLoading(false);
@@ -157,22 +158,55 @@ export function ChatPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">{t('sd.chatsTitle')}</h1>
+      <div>
+        <h1 className="text-2xl font-bold">{t('sd.chatsTitle')}</h1>
+        <p className="mt-1 text-xs text-ink-muted">تواصل مباشرة مع الدعم الفني للأكاديمية، أو مع المدرسين والطلاب</p>
+      </div>
       {loading ? <Skeleton className="h-80 w-full" /> : rooms.length === 0 ? (
         <EmptyState title={t('sd.ordersEmptyTitle')} hint={t('sd.chatsEmptyHint')} />
       ) : (
-        <div className="flex h-[560px] gap-4">
-          <div className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto">
+        <div className="flex h-[580px] gap-4">
+          <div className="flex w-64 shrink-0 flex-col gap-1.5 overflow-y-auto">
             {rooms.map((r) => {
-              const peer = (r.participants ?? []).map((p) => p.fullName).filter(Boolean)[0];
+              const isSupport = r.isSupport || (r.participants ?? []).some((p) => p.role === 'ADMIN' || (p as { username?: string }).username === 'siraj_support');
+              const peer = (r.participants ?? []).find((p) => (p.id || (p as { userId?: string }).userId) !== user?.id);
+              const displayName = isSupport
+                ? 'الدعم الفني — أكاديمية سراج'
+                : (r.title ?? peer?.fullName ?? t('sd.conversation'));
+              const isCurrent = r.id === active;
+
               return (
                 <button
                   key={r.id}
                   onClick={() => setActive(r.id)}
-                  className={`rounded-md px-3 py-2.5 text-start text-sm transition-colors ${r.id === active ? 'bg-elevated text-gold-200' : 'text-ink-secondary hover:bg-elevated/60'}`}
+                  className={`group relative flex flex-col items-start gap-1 rounded-xl p-3 text-start text-sm transition-all ${
+                    isCurrent
+                      ? 'border border-gold-500/50 bg-gold-500/15 text-gold-200 shadow-sm'
+                      : isSupport
+                      ? 'border border-line-gold/50 bg-surface-2/80 text-ink-primary hover:border-gold-500/30 hover:bg-surface-2'
+                      : 'border border-line/50 bg-surface text-ink-secondary hover:bg-elevated/70'
+                  }`}
                 >
-                  <span className="block truncate font-medium">{r.title ?? peer ?? t('sd.conversation')}</span>
-                  {r.unreadCount ? <span className="text-[10px] text-coral">{t('sd.unread', { count: r.unreadCount })}</span> : null}
+                  <div className="flex w-full items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {isSupport && (
+                        <span className="inline-flex shrink-0 items-center rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-300">
+                          الدعم الفني
+                        </span>
+                      )}
+                      <span className="truncate font-semibold">{displayName}</span>
+                    </div>
+                    {Boolean(r.unread || r.unreadCount) && (
+                      <span className="shrink-0 rounded-full bg-coral px-1.5 py-0.2 text-[10px] font-bold text-white">
+                        {r.unread || r.unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  {r.lastMessage?.body && (
+                    <span className="line-clamp-1 text-xs text-ink-muted">
+                      {r.lastMessage.body}
+                    </span>
+                  )}
                 </button>
               );
             })}

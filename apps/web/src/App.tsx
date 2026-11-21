@@ -42,7 +42,7 @@ import NotFound from './pages/NotFound';
 import { DashboardHome, Orders, OrderDetail } from './pages/dashboard/student/StudentPages';
 import { MyCourses, MyRequests, StudentCustomRequests, ChatPage, Notifications, Favorites, Profile } from './pages/dashboard/student/StudentOther';
 
-import { TeacherHome, TeacherOfferings, TeacherRequests, TeacherAds, TeacherLive, TeacherEarnings, TeacherProfileDash } from './pages/dashboard/teacher/TeacherPages';
+import { TeacherHome, TeacherOfferings, TeacherRequests, TeacherLive, TeacherEarnings, TeacherProfileDash } from './pages/dashboard/teacher/TeacherPages';
 
 import {
   AdminHome,
@@ -203,7 +203,7 @@ export default function App() {
               <Route index element={<TeacherHome />} />
               <Route path="offerings" element={<TeacherOfferings />} />
               <Route path="requests" element={<TeacherRequests />} />
-              <Route path="ads" element={<TeacherAds />} />
+              <Route path="ads" element={<Navigate to="/teacher" replace />} />
               <Route path="live" element={<TeacherLive />} />
               <Route path="earnings" element={<TeacherEarnings />} />
               <Route path="chat" element={<ChatPage />} />

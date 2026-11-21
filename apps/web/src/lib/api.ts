@@ -389,8 +389,10 @@ export interface ChatRoom {
   title?: string | null;
   ownerId?: string | null;
   unreadCount?: number;
+  unread?: number;
+  isSupport?: boolean;
   participants?: User[];
-  lastMessage?: { body: string | null; createdAt: string; senderId: string } | null;
+  lastMessage?: { body: string | null; createdAt?: string; at?: string; sender?: string; senderId?: string } | null;
 }
 
 export interface ChatMessage {

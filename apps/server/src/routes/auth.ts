@@ -24,6 +24,7 @@ import { getTrustedClientIp } from "../lib/ipShield";
 import { requireCaptcha } from "../middleware/captcha";
 import { getSecuritySettings } from "../lib/securitySettings";
 import { securityCache } from "../lib/redis";
+import { ensureUserSupportRoom } from "../lib/supportChat";
 import {
   studentRegisterSchema,
   teacherRegisterSchema,
@@ -242,6 +243,8 @@ router.post(
       throw err;
     }
 
+    void ensureUserSupportRoom(user).catch(() => {});
+
     await audit({
       req,
       userId: user.id,
@@ -367,6 +370,8 @@ router.post(
         status: "PENDING",
       },
     });
+
+    void ensureUserSupportRoom(user).catch(() => {});
 
     await audit({
       req,
@@ -632,6 +637,7 @@ router.post(
     }
 
     triggerUsersExcelSync();
+    void ensureUserSupportRoom(user).catch(() => {});
 
     await audit({
       req,

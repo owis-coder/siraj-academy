@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type Offering, type Lesson, type ExplainRequest, type LiveSession, type Course, type Ad } from '../../../lib/api';
+import { api, type Offering, type Lesson, type ExplainRequest, type LiveSession, type Course } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { Card, Badge, Button, StatCard, Skeleton, EmptyState, Modal, Form, Field, Input, Select, Textarea } from '../../../components/ui';
-import { OFFERING_STATUS_LABEL, TEACHER_STATUS_LABEL, formatDateTime, formatMoney, URGENCY_LABEL, AD_STATUS_LABEL } from '../../../lib/format';
+import { OFFERING_STATUS_LABEL, TEACHER_STATUS_LABEL, formatDateTime, formatMoney, URGENCY_LABEL } from '../../../lib/format';
 import { useToast } from '../../../lib/toast';
 import { useI18n } from '../../../i18n';
 
@@ -409,98 +409,6 @@ function OfferModal({ r, onClose, onDone, submit }: { r: ExplainRequest; onClose
         <Field label={t('td.messageToStudent')}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
         <Field label={t('td.durationDays')}><Input type="number" min={1} value={days} onChange={(e) => setDays(e.target.value)} /></Field>
         <Button type="submit" loading={busy} className="w-full">{t('td.sendOffer')}</Button>
-      </Form>
-    </Modal>
-  );
-}
-
-/* ================= إعلاناتي ================= */
-export function TeacherAds() {
-  const toast = useToast();
-  const { t } = useI18n();
-  const [items, setItems] = useState<Ad[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-
-  const load = () => {
-    setLoading(true);
-    api.ads.list(true).then(({ data }) => { setItems(data ?? []); setLoading(false); }).catch(() => { setItems([]); setLoading(false); });
-  };
-  useEffect(load, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">{t('td.adsTitle')}</h1>
-          <p className="text-sm text-ink-muted">{t('td.adsSubtitle')}</p>
-        </div>
-        <Button onClick={() => setCreating(true)}>{t('td.newAd')}</Button>
-      </div>
-      {loading ? <Skeleton className="h-56 w-full" /> : items.length === 0 ? (
-        <EmptyState title={t('td.noAds')} hint={t('td.noAdsHint')} action={<Button variant="outline" onClick={() => setCreating(true)}>{t('td.createAd')}</Button>} />
-      ) : (
-        <div className="space-y-4">
-          {items.map((a) => (
-            <Card key={a.id} className="p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{a.title}</p>
-                  {a.body && <p className="mt-1 text-sm text-ink-secondary">{a.body}</p>}
-                  {a.linkUrl && <a href={a.linkUrl} target="_blank" rel="noreferrer" dir="ltr" className="mt-1 block text-xs text-teal hover:underline">{a.linkUrl}</a>}
-                  {a.reviewerNote && <p className="mt-2 rounded-md border border-danger/30 bg-danger/5 p-2 text-xs text-coral">{t('td.adminNote', { note: a.reviewerNote })}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge tone={a.status === 'APPROVED' ? 'ok' : a.status === 'PENDING_REVIEW' ? 'warn' : a.status === 'REJECTED' ? 'danger' : 'muted'}>{t(AD_STATUS_LABEL[a.status])}</Badge>
-                  {a.status === 'DRAFT' && (
-                    <>
-                      <Button size="sm" onClick={async () => { try { await api.ads.submit(a.id); toast.push('success', t('td.adSent')); load(); } catch (e) { toast.push('error', e instanceof Error ? e.message : t('td.submitFailed')); } }}>{t('td.submitForReview')}</Button>
-                      <Button size="sm" variant="subtle" onClick={async () => {
-                        const nextTitle = prompt(t('td.adTitlePrompt'), a.title); if (nextTitle == null) return;
-                        const nextBody = prompt(t('td.adBodyPrompt'), a.body ?? '');
-                        try { await api.ads.update(a.id, { title: nextTitle, body: nextBody ?? undefined }); toast.push('success', t('td.updated')); load(); } catch { toast.push('error', t('td.editFailed')); }
-                      }}>{t('td.edit')}</Button>
-                    </>
-                  )}
-                  {a.status === 'APPROVED' && (
-                    <Button size="sm" variant="ghost" onClick={async () => { try { await api.ads.update(a.id, { title: a.title, body: a.body, imageUrl: a.imageUrl, linkUrl: a.linkUrl }); toast.push('success', t('td.editReturnsReviewMsg')); load(); } catch { toast.push('error', t('td.editFailed')); } }}>{t('td.editReturnsReview')}</Button>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-      {creating && (
-        <AdCreate onClose={() => setCreating(false)} onDone={() => { setCreating(false); load(); }} />
-      )}
-    </div>
-  );
-}
-
-function AdCreate({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const { t } = useI18n();
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [linkUrl, setLinkUrl] = useState('');
-  const [busy, setBusy] = useState(false);
-  return (
-    <Modal open onClose={onClose} title={t('td.newAd')}>
-      <Form onSubmit={async () => {
-        if (!title.trim()) return;
-        setBusy(true);
-        try {
-          await api.ads.create({ title, body: body || undefined, imageUrl: imageUrl || undefined, linkUrl: linkUrl || undefined });
-          onDone();
-        } catch { /* */ }
-        finally { setBusy(false); }
-      }} className="space-y-4">
-        <Field label={t('td.adTitle')} required><Input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
-        <Field label={t('td.adBody')}><Textarea value={body} onChange={(e) => setBody(e.target.value)} /></Field>
-        <Field label={t('td.imageUrlOptional')}><Input dir="ltr" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} /></Field>
-        <Field label={t('td.pageUrlOptional')}><Input dir="ltr" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} /></Field>
-        <Button type="submit" loading={busy} className="w-full">{t('td.saveDraft')}</Button>
       </Form>
     </Modal>
   );

@@ -72,7 +72,6 @@ const NAVS: Record<Role, NavItem[]> = {
     { to: '/teacher', labelKey: 'dash.overview', icon: IconDashboard },
     { to: '/teacher/offerings', labelKey: 'dash.teacherOfferings', icon: IconGraduation },
     { to: '/teacher/requests', labelKey: 'dash.availableRequests', icon: IconRequests },
-    { to: '/teacher/ads', labelKey: 'dash.ads', icon: IconMegaphone },
     { to: '/teacher/live', labelKey: 'dash.live', icon: IconLive },
     { to: '/teacher/earnings', labelKey: 'dash.earnings', icon: IconWallet },
     { to: '/teacher/chat', labelKey: 'dash.chats', icon: IconChat },

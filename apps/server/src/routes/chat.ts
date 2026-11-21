@@ -6,14 +6,20 @@ import { requireAuth } from "../middleware/auth";
 import { parseBody, parseQuery } from "../middleware/validate";
 import { asyncHandler } from "../middleware/errorHandler";
 import { createRoomSchema, messageListSchema, sendMessageSchema, reportRoomSchema } from "../validation/chat";
+import { getOrCreateSupportUser, ensureUserSupportRoom, SUPPORT_FULL_NAME } from "../lib/supportChat";
 
 const router = Router();
 
-async function getMembership(roomId: string, userId: string) {
+async function getMembership(roomId: string, userId: string, role?: string) {
   const participant = await prisma.chatParticipant.findUnique({
     where: { roomId_userId: { roomId, userId } },
   });
-  if (!participant) throw forbidden("لست مشاركًا في هذه المحادثة");
+  if (!participant) {
+    if (role === "ADMIN") {
+      return { roomId, userId, role: "ADMIN", lastReadAt: null };
+    }
+    throw forbidden("لست مشاركًا في هذه المحادثة");
+  }
   return participant;
 }
 
@@ -22,6 +28,17 @@ router.get(
   "/rooms",
   requireAuth(),
   asyncHandler(async (req, res) => {
+    // ضمان وجود حساب الدعم الفني وغرفة الدعم المخصصة مع رسالة الترحيب التلقائية
+    let supportUser = null;
+    try {
+      supportUser = await getOrCreateSupportUser();
+      if (req.user!.id !== supportUser.id) {
+        await ensureUserSupportRoom(req.user!);
+      }
+    } catch {
+      // عدم تعطيل قائمة المحادثات في حال حدوث أي خطأ غير متوقع
+    }
+
     const mine = await prisma.chatParticipant.findMany({
       where: { userId: req.user!.id },
       include: {
@@ -35,6 +52,8 @@ router.get(
       orderBy: { createdAt: "desc" },
     });
 
+    const supportId = supportUser?.id;
+
     const rooms = await Promise.all(
       mine.map(async (p) => {
         const unread = await prisma.message.count({
@@ -44,13 +63,16 @@ router.get(
             senderId: { not: req.user!.id },
           },
         });
+        const isSupport = Boolean(supportId && p.room.participants.some((x) => x.user.id === supportId));
         return {
           id: p.roomId,
           type: p.room.type,
-          title: p.room.title,
+          title: isSupport ? SUPPORT_FULL_NAME : p.room.title,
           orderId: p.room.orderId,
           myLastReadAt: p.lastReadAt,
+          isSupport,
           participants: p.room.participants.map((x) => ({
+            id: x.user.id,
             userId: x.user.id,
             fullName: x.user.fullName,
             username: x.user.username,
@@ -63,6 +85,13 @@ router.get(
         };
       }),
     );
+
+    // ترتيب المحادثات: وضع محادثة الدعم دائمًا في أول خانة
+    rooms.sort((a, b) => {
+      if (a.isSupport && !b.isSupport) return -1;
+      if (!a.isSupport && b.isSupport) return 1;
+      return 0;
+    });
 
     res.json({ data: rooms, meta: { total: rooms.length } });
   }),
@@ -125,7 +154,7 @@ router.get(
   parseQuery(messageListSchema),
   asyncHandler(async (req, res) => {
     const roomId = req.params.id;
-    await getMembership(roomId, req.user!.id);
+    await getMembership(roomId, req.user!.id, req.user!.role);
 
     const { before, limit } = req.query as unknown as { before?: string; limit: number };
     const beforeDate = before ? new Date(before) : undefined;
@@ -150,7 +179,7 @@ router.post(
   parseBody(sendMessageSchema),
   asyncHandler(async (req, res) => {
     const roomId = req.params.id;
-    await getMembership(roomId, req.user!.id);
+    await getMembership(roomId, req.user!.id, req.user!.role);
     const { body, attachmentUrl } = req.body as { body?: string; attachmentUrl?: string };
 
     // منع الرسائل إن حُظر أحد الطرفين الآخر في محادثة مباشرة
@@ -184,10 +213,11 @@ router.post(
   requireAuth(),
   asyncHandler(async (req, res) => {
     const at = new Date();
-    await getMembership(req.params.id, req.user!.id);
-    await prisma.chatParticipant.update({
+    await getMembership(req.params.id, req.user!.id, req.user!.role);
+    await prisma.chatParticipant.upsert({
       where: { roomId_userId: { roomId: req.params.id, userId: req.user!.id } },
-      data: { lastReadAt: at },
+      update: { lastReadAt: at },
+      create: { roomId: req.params.id, userId: req.user!.id, role: req.user!.role === "ADMIN" ? "ADMIN" : "MEMBER", lastReadAt: at },
     });
     const io = getIO();
     if (io) io.to(`room:${req.params.id}`).emit("message:read", { roomId: req.params.id, userId: req.user!.id, at: at.toISOString() });
