@@ -122,10 +122,7 @@ router.get(
 const teacherProfileUpdateSchema = z
   .object({
     fullName: z.string().min(3).max(120).optional(),
-    whatsapp: z
-      .string()
-      .regex(/^\+?9665\d{8}$|^05\d{8}$/, "رقم واتساب غير صحيح")
-      .optional(),
+    whatsapp: z.string().min(5).max(30).optional(),
     degree: z.string().min(2).max(200).optional(),
     bio: z.string().max(2000).optional(),
     specialties: z.string().max(500).optional(),

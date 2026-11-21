@@ -8,7 +8,48 @@ import { PageHeader } from '../../components/PageHeader';
 import { useI18n } from '../../i18n';
 import { IconArrowForward, IconArrowBack } from '../../components/icons';
 
-const WHATSAPP_RE = /^(05|5|9665|\+9665)\d{8}$/;
+const COUNTRY_CODES = [
+  { code: '+966', nameAr: 'السعودية', nameEn: 'Saudi Arabia' },
+  { code: '+967', nameAr: 'اليمن', nameEn: 'Yemen' },
+  { code: '+971', nameAr: 'الإمارات', nameEn: 'UAE' },
+  { code: '+965', nameAr: 'الكويت', nameEn: 'Kuwait' },
+  { code: '+974', nameAr: 'قطر', nameEn: 'Qatar' },
+  { code: '+973', nameAr: 'البحرين', nameEn: 'Bahrain' },
+  { code: '+968', nameAr: 'عُمان', nameEn: 'Oman' },
+  { code: '+20', nameAr: 'مصر', nameEn: 'Egypt' },
+  { code: '+962', nameAr: 'الأردن', nameEn: 'Jordan' },
+  { code: '+964', nameAr: 'العراق', nameEn: 'Iraq' },
+  { code: '+963', nameAr: 'سوريا', nameEn: 'Syria' },
+  { code: '+961', nameAr: 'لبنان', nameEn: 'Lebanon' },
+  { code: '+970', nameAr: 'فلسطين', nameEn: 'Palestine' },
+  { code: '+249', nameAr: 'السودان', nameEn: 'Sudan' },
+  { code: '+218', nameAr: 'ليبيا', nameEn: 'Libya' },
+  { code: '+213', nameAr: 'الجزائر', nameEn: 'Algeria' },
+  { code: '+216', nameAr: 'تونس', nameEn: 'Tunisia' },
+  { code: '+212', nameAr: 'المغرب', nameEn: 'Morocco' },
+  { code: '+222', nameAr: 'موريتانيا', nameEn: 'Mauritania' },
+  { code: '+90', nameAr: 'تركيا', nameEn: 'Turkey' },
+  { code: '+44', nameAr: 'المملكة المتحدة', nameEn: 'UK' },
+  { code: '+1', nameAr: 'الولايات المتحدة / كندا', nameEn: 'USA / Canada' },
+  { code: '+60', nameAr: 'ماليزيا', nameEn: 'Malaysia' },
+  { code: '+91', nameAr: 'الهند', nameEn: 'India' },
+  { code: '+92', nameAr: 'باكستان', nameEn: 'Pakistan' },
+  { code: '', nameAr: 'أخرى (بدون كود)', nameEn: 'Other (No code)' },
+];
+
+function parsePhone(raw: string): { code: string; number: string } {
+  if (!raw) return { code: '+966', number: '' };
+  const trimmed = raw.trim();
+  for (const c of COUNTRY_CODES) {
+    if (c.code && (trimmed.startsWith(c.code) || trimmed.startsWith(c.code.replace('+', '')))) {
+      const rest = trimmed.startsWith(c.code)
+        ? trimmed.slice(c.code.length)
+        : trimmed.slice(c.code.replace('+', '').length);
+      return { code: c.code, number: rest.trim() };
+    }
+  }
+  return { code: '+966', number: trimmed };
+}
 
 type FormState = {
   fullName: string;
@@ -44,13 +85,15 @@ export default function RequestNew() {
   const nav = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [step, setStep] = useState(1);
   const [f, setF] = useState<FormState>(() => ({
     ...INITIAL,
     fullName: user?.fullName ?? '',
     whatsapp: user?.whatsapp ?? '',
   }));
+  const [countryCode, setCountryCode] = useState('+966');
+  const [phoneBody, setPhoneBody] = useState('');
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [unis, setUnis] = useState<University[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
@@ -58,6 +101,21 @@ export default function RequestNew() {
   const [sending, setSending] = useState(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
+
+  const handlePhoneChange = (code: string, num: string) => {
+    setCountryCode(code);
+    setPhoneBody(num);
+    const cleanNum = num.trim();
+    if (!cleanNum) {
+      set('whatsapp', '');
+    } else if (cleanNum.startsWith('+')) {
+      set('whatsapp', cleanNum);
+    } else if (code) {
+      set('whatsapp', `${code}${cleanNum.replace(/^0+/, '')}`);
+    } else {
+      set('whatsapp', cleanNum);
+    }
+  };
 
   useEffect(() => {
     api.universities.list().then(({ data }) => setUnis(data ?? [])).catch(() => setUnis([]));
@@ -70,7 +128,11 @@ export default function RequestNew() {
   }, [f.universityId]);
 
   useEffect(() => {
-    setF((s) => ({ ...s, fullName: s.fullName || user?.fullName || '', whatsapp: s.whatsapp || user?.whatsapp || '' }));
+    const rawPhone = f.whatsapp || user?.whatsapp || '';
+    const parsed = parsePhone(rawPhone);
+    setCountryCode(parsed.code);
+    setPhoneBody(parsed.number);
+    setF((s) => ({ ...s, fullName: s.fullName || user?.fullName || '', whatsapp: rawPhone }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -78,8 +140,7 @@ export default function RequestNew() {
     const e: Partial<Record<keyof FormState, string>> = {};
     if (s === 1) {
       if (!f.fullName.trim()) e.fullName = t('requestNew.nameRequired');
-      if (f.whatsapp && !WHATSAPP_RE.test(f.whatsapp.replace(/[\s-]/g, ''))) e.whatsapp = t('requestNew.whatsappErr');
-      if (f.whatsapp && !f.universityId) e.universityId = t('requestNew.universityRequired');
+      if (!f.universityId) e.universityId = t('requestNew.universityRequired');
     }
     if (s === 2) {
       if (!f.courseTitle.trim() || f.courseTitle.trim().length < 3) e.courseTitle = t('requestNew.subjectMin');
@@ -125,6 +186,9 @@ export default function RequestNew() {
         linkUrl: f.linkUrl || undefined,
         attachments: [],
       });
+      if (f.whatsapp && f.whatsapp !== user.whatsapp) {
+        await api.account.updateProfile({ whatsapp: f.whatsapp }).catch(() => {});
+      }
       toast.push('success', t('requestNew.sent'));
       nav('/dashboard/requests');
     } catch (e) {
@@ -179,10 +243,29 @@ export default function RequestNew() {
             <p className="text-sm font-semibold text-gold-200">{t('requestNew.sec1')}</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('requestNew.name')} required error={errors.fullName}>
-                <Input value={f.fullName} onChange={(e) => set('fullName', e.target.value)} placeholder={t('requestNew.namePlaceholder')} />
+                <Input value={f.fullName} onChange={(e) => set('fullName', e.target.value)} />
               </Field>
-              <Field label={t('requestNew.whatsapp')} hint={t('requestNew.whatsappHint')} error={errors.whatsapp}>
-                <Input dir="ltr" value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="9665xxxxxxxx" />
+              <Field label={t('requestNew.whatsapp')} error={errors.whatsapp}>
+                <div className="flex gap-2">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => handlePhoneChange(e.target.value, phoneBody)}
+                    className="w-36 shrink-0 rounded-lg border border-line bg-surface px-2 py-2 text-xs font-semibold text-ink-primary outline-none focus:border-gold-500"
+                    dir="ltr"
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {lang === 'ar' ? c.nameAr : c.nameEn} ({c.code || '—'})
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    dir="ltr"
+                    value={phoneBody}
+                    onChange={(e) => handlePhoneChange(countryCode, e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
               </Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
