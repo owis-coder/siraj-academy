@@ -28,6 +28,7 @@ import uploadsRouter from "./routes/uploads";
 import filesRouter from "./routes/files";
 import platformRouter from "./routes/platform";
 import adminRouter from "./routes/admin";
+import adminUsersRouter from "./routes/adminUsers";
 import adminSecurityRouter from "./routes/adminSecurity";
 import teacherRouter from "./routes/teacher";
 import usersRouter from "./routes/users";
@@ -128,6 +129,7 @@ export function createApp(): express.Express {
   api.use("/notifications", notificationsRouter);
   api.use("/uploads", uploadsRouter);
   api.use("/admin/security", adminSecurityRouter);
+  api.use("/admin/users", adminUsersRouter);
   api.use("/admin", adminRouter);
   api.use("/teacher", teacherRouter);
   api.use("/users", usersRouter);

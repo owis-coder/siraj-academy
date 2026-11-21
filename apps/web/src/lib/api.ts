@@ -1018,6 +1018,34 @@ export const api = {
       resolveIncident: (id: string) =>
         request<{ message: string }>(`/admin/security/incidents/${id}/resolve`, { method: 'POST' }),
     },
+    users: {
+      stats: () => request<UserManagementStats>('/admin/users/stats'),
+      list: (query?: { q?: string; role?: string; status?: string; filter?: string; page?: number; limit?: number }) =>
+        request<{ items: AdminUserListItem[]; total: number; page: number; totalPages: number }>('/admin/users', { query }),
+      recoveries: (query?: { status?: string; page?: number; limit?: number }) =>
+        request<{ items: AdminRecoveryItem[]; total: number; page: number; totalPages: number }>('/admin/users/recoveries', { query }),
+      get: (id: string) => request<{ user: AdminUserDetail }>(`/admin/users/${id}`),
+      updateProfile: (id: string, body: { fullName?: string; whatsapp?: string; level?: string; bio?: string }) =>
+        request<any>(`/admin/users/${id}/profile`, { method: 'PATCH', body }),
+      changeUsername: (id: string, body: { username: string }) =>
+        request<any>(`/admin/users/${id}/username`, { method: 'PATCH', body }),
+      changeEmail: (id: string, body: { email: string; reason: string }) =>
+        request<any>(`/admin/users/${id}/email`, { method: 'PATCH', body }),
+      suspend: (id: string, body: { reason: string }) =>
+        request<any>(`/admin/users/${id}/suspend`, { method: 'POST', body }),
+      reactivate: (id: string) =>
+        request<any>(`/admin/users/${id}/reactivate`, { method: 'POST' }),
+      revokeSessions: (id: string) =>
+        request<any>(`/admin/users/${id}/revoke-sessions`, { method: 'POST' }),
+      sendRecoveryEmail: (id: string) =>
+        request<any>(`/admin/users/${id}/send-recovery-email`, { method: 'POST' }),
+      createAlternativeRecovery: (id: string, body: { alternativeEmail: string; reason: string; verificationMethod: string; verificationNotes?: string; evidenceRef?: string }) =>
+        request<any>(`/admin/users/${id}/alternative-recovery`, { method: 'POST', body }),
+      reviewRecovery: (id: string, body: { decision: 'APPROVED' | 'REJECTED'; notes?: string }) =>
+        request<any>(`/admin/users/recoveries/${id}/review`, { method: 'POST', body }),
+      changeRole: (id: string, body: { role: string; confirm: boolean }) =>
+        request<any>(`/admin/users/${id}/role`, { method: 'POST', body }),
+    },
   },
   refunds: {
     eligible: () => request<Array<{ id: string; orderNo: string; title: string; amount: number; targetType: string; maxRefundable: number; alreadyRefunded: number; paidAt: string }>>('/refunds/eligible'),
@@ -1046,4 +1074,136 @@ export const api = {
     adminExecute: (id: string, body: { transferProofUrl: string; transferReferenceNo: string; transferredAt?: string; adminNotes?: string }) =>
       request<TeacherWithdrawal>(`/withdrawals/admin/${id}/execute`, { method: 'POST', body }),
   },
+  recovery: {
+    checkToken: (token: string) => request<RecoveryTokenInfo>('/auth/recovery/verify', { query: { token } }),
+    complete: (body: { token: string; password: string }) => request<{ success: boolean; message: string }>('/auth/recovery/verify', { method: 'POST', body }),
+  },
 };
+
+export interface UserManagementStats {
+  totalUsers: number;
+  studentsCount: number;
+  teachersCount: number;
+  adminsCount: number;
+  activeCount: number;
+  suspendedCount: number;
+  unverifiedCount: number;
+  pendingRecoveriesCount: number;
+}
+
+export interface AdminUserListItem {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string;
+  role: 'STUDENT' | 'TEACHER' | 'ADMIN';
+  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
+  emailVerified: boolean;
+  emailVerifiedAt?: string | null;
+  whatsapp?: string | null;
+  level?: string | null;
+  avatarUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  activeSessionsCount: number;
+  recoveryRequestsCount: number;
+  teacherProfile?: { id: string; degree: string; status: string } | null;
+}
+
+export interface AdminRecoveryItem {
+  id: string;
+  recoveryNo: string;
+  userId: string;
+  originalEmail: string;
+  alternativeEmail: string;
+  reason: string;
+  verificationMethod: string;
+  verificationNotes?: string | null;
+  evidenceRef?: string | null;
+  isHighRisk: boolean;
+  approvalRequired: boolean;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'VERIFICATION_SENT' | 'COMPLETED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+  tokenExpiresAt?: string | null;
+  reviewedAt?: string | null;
+  reviewNotes?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    fullName: string;
+    username: string;
+    email: string;
+    role: string;
+    status: string;
+  };
+  initiator: { id: string; fullName: string; username: string; email: string };
+  reviewer?: { id: string; fullName: string; username: string; email: string } | null;
+  approvals?: Array<{
+    id: string;
+    adminId: string;
+    decision: string;
+    notes?: string | null;
+    createdAt: string;
+    admin: { id: string; fullName: string; username: string };
+  }>;
+}
+
+export interface AdminUserDetail {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string;
+  role: 'STUDENT' | 'TEACHER' | 'ADMIN';
+  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
+  emailVerified: boolean;
+  emailVerifiedAt?: string | null;
+  whatsapp?: string | null;
+  level?: string | null;
+  avatarUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sessionVersion: number;
+  adminPermissions: string[];
+  university?: { id: string; name: string } | null;
+  major?: { id: string; name: string } | null;
+  teacherProfile?: {
+    id: string;
+    degree: string;
+    bio: string;
+    status: string;
+    offerings?: Array<{ id: string; title: string; status: string; price: number }>;
+    services?: Array<{ id: string; title: string; isActive: boolean; basePrice?: number | null }>;
+  } | null;
+  sessions: Array<{
+    id: string;
+    ip?: string | null;
+    userAgent?: string | null;
+    createdAt: string;
+    lastSeenAt: string;
+    endedAt?: string | null;
+    endReason?: string | null;
+  }>;
+  recoveries: AdminRecoveryItem[];
+  risk: { isHighRisk: boolean; reasons: string[] };
+  auditLogs: Array<{
+    id: string;
+    action: string;
+    category: string;
+    result: string;
+    createdAt: string;
+    ip?: string | null;
+    oldValues?: any;
+    newValues?: any;
+  }>;
+}
+
+export interface RecoveryTokenInfo {
+  valid: boolean;
+  recoveryNo: string;
+  userFullName: string;
+  username: string;
+  maskedOriginalEmail: string;
+  maskedAlternativeEmail: string;
+  expiresAt: string;
+}
+

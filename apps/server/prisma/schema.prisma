@@ -212,6 +212,11 @@ model User {
   withdrawalsReviewed    TeacherWithdrawal[]     @relation("WithdrawalReviewer")
   journalEntriesCreated  FinancialJournalEntry[] @relation("JournalCreator")
   ledgerLines            FinancialLedgerLine[]   @relation("LedgerUser")
+  adminPermissions       String[]                @default([])
+  targetRecoveries       AccountRecoveryRequest[] @relation("TargetUserRecoveries")
+  initiatedRecoveries    AccountRecoveryRequest[] @relation("RecoveryInitiator")
+  reviewedRecoveries     AccountRecoveryRequest[] @relation("RecoveryReviewer")
+  recoveryApprovals      AccountRecoveryApproval[] @relation("RecoveryApprover")
 
   @@index([role])
   @@index([status])
@@ -1111,6 +1116,83 @@ model TeacherEarning {
   @@index([orderId])
   @@index([status])
 }
+
+// ---------- نظام استعادة الحسابات وإدارتها بواسطة المشرفين ----------
+
+enum AccountRecoveryStatus {
+  PENDING_APPROVAL
+  APPROVED
+  VERIFICATION_SENT
+  COMPLETED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum RecoveryVerificationMethod {
+  NATIONAL_ID
+  PASSPORT
+  STUDENT_ID
+  ACADEMIC_RECORD
+  OFFICIAL_PHONE_CALL
+  VIDEO_VERIFICATION
+  DOCUMENT_UPLOAD
+  OTHER
+}
+
+model AccountRecoveryRequest {
+  id                 String                     @id @default(cuid())
+  recoveryNo         String                     @unique // e.g. REC-2026-000001
+  userId             String
+  originalEmail      String
+  alternativeEmail   String
+  reason             String                     // سبب فقدان الوصول للبريد الأصلي
+  verificationMethod RecoveryVerificationMethod @default(OTHER)
+  verificationNotes  String?                    // ملاحظات الإدارة وتفاصيل التحقق
+  evidenceRef        String?                    // الرقم المرجعي أو معرف التذكرة (لا تخزين لمستندات حساسة بلا داعٍ)
+  isHighRisk         Boolean                    @default(false)
+  approvalRequired   Boolean                    @default(false)
+  status             AccountRecoveryStatus      @default(PENDING_APPROVAL)
+  tokenHash          String?                    @unique // تجزئة SHA-256 لرمز التحقق
+  tokenExpiresAt     DateTime?
+  initiatorId        String
+  reviewerId         String?
+  reviewedAt         DateTime?
+  reviewNotes        String?
+  completedAt        DateTime?
+  completedIp        String?
+  ipAddress          String?
+  userAgent          String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  user      User                      @relation("TargetUserRecoveries", fields: [userId], references: [id], onDelete: Cascade)
+  initiator User                      @relation("RecoveryInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  reviewer  User?                     @relation("RecoveryReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  approvals AccountRecoveryApproval[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([alternativeEmail])
+}
+
+model AccountRecoveryApproval {
+  id        String   @id @default(cuid())
+  requestId String
+  adminId   String
+  decision  String   // APPROVED, REJECTED
+  notes     String?
+  createdAt DateTime @default(now())
+
+  request AccountRecoveryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  admin   User                   @relation("RecoveryApprover", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, adminId])
+  @@index([requestId])
+  @@index([adminId])
+}
+
 
 
 

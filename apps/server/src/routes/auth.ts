@@ -1469,6 +1469,32 @@ router.post(
   }),
 );
 
+// ---------- استعادة الحساب بالبريد البديل (التحقق وتعيين كلمة المرور الجديدة) ----------
+router.get(
+  "/recovery/verify",
+  asyncHandler(async (req, res) => {
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    const { getRecoveryTokenDetails } = await import("../lib/recoveryService");
+    const details = await getRecoveryTokenDetails(token);
+    res.json({ data: details });
+  }),
+);
+
+router.post(
+  "/recovery/verify",
+  asyncHandler(async (req, res) => {
+    const { token, password } = req.body as { token: string; password: string };
+    const { completeAlternativeRecovery } = await import("../lib/recoveryService");
+    const result = await completeAlternativeRecovery({
+      rawToken: token,
+      newPassword: password,
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+    res.json({ data: result });
+  }),
+);
+
 // ---------- بيانات الجلسات (لصاحب الحساب فقط) — تُستخدم من صفحة الإعدادات ----------
 router.get(
   "/sessions",

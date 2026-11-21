@@ -34,6 +34,8 @@ import AdminAudit from './pages/dashboard/admin/AdminAudit';
 import AdminSecurity from './pages/dashboard/admin/AdminSecurity';
 import AdminRefunds from './pages/dashboard/admin/AdminRefunds';
 import AdminWithdrawals from './pages/dashboard/admin/AdminWithdrawals';
+import AdminUserManagement from './pages/dashboard/admin/AdminUserManagement';
+import RecoveryVerify from './pages/public/RecoveryVerify';
 import StudentRefunds from './pages/dashboard/student/StudentRefunds';
 import About from './pages/public/About';
 import Faq from './pages/public/Faq';
@@ -142,6 +144,7 @@ export default function App() {
               <Route path="verify-email" element={<VerifyEmail />} />
               <Route path="forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
               <Route path="reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+              <Route path="recovery/verify" element={<RecoveryVerify />} />
               <Route path="confirm-email-change" element={<ConfirmEmailChange />} />
 
               {/* ===== الحساب مدمج في الموقع (طالب/مدرّس/إدارة) ===== */}
@@ -232,6 +235,7 @@ export default function App() {
               }
             >
               <Route index element={<AdminHome />} />
+              <Route path="users" element={<AdminUserManagement />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="universities" element={<AdminCrud cfg={UNIS_CFG} />} />
               <Route path="colleges" element={<AdminColleges />} />

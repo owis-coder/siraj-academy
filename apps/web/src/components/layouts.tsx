@@ -82,6 +82,7 @@ const NAVS: Record<Role, NavItem[]> = {
   ],
   ADMIN: [
     { to: '/admin', labelKey: 'dash.overview', icon: IconDashboard },
+    { to: '/admin/users', labelKey: 'dash.usersManagement', icon: IconTeachers },
     { to: '/admin/chat', labelKey: 'dash.supportChats', icon: IconChat },
     { to: '/admin/universities', labelKey: 'dash.universities', icon: IconUniversities },
     { to: '/admin/colleges', labelKey: 'dash.colleges', icon: IconColleges },
