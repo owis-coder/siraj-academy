@@ -32,6 +32,8 @@ import adminSecurityRouter from "./routes/adminSecurity";
 import teacherRouter from "./routes/teacher";
 import usersRouter from "./routes/users";
 import customRequestsRouter from "./routes/customRequests";
+import refundsRouter from "./routes/refunds";
+import withdrawalsRouter from "./routes/withdrawals";
 
 export function createApp(): express.Express {
   // تهيئة عميل التخزين المشترك (Redis / Memory Fallback)
@@ -130,6 +132,8 @@ export function createApp(): express.Express {
   api.use("/teacher", teacherRouter);
   api.use("/users", usersRouter);
   api.use("/custom-requests", customRequestsRouter);
+  api.use("/refunds", refundsRouter);
+  api.use("/withdrawals", withdrawalsRouter);
 
   app.use("/api/v1", api);
 

@@ -7,6 +7,8 @@ import { parseBody, parseQuery } from "../middleware/validate";
 import { asyncHandler } from "../middleware/errorHandler";
 import { pageMeta, skipTake } from "../validation/common";
 import { reviewPaymentSchema, paymentListSchema } from "../validation/orders";
+import { recordJournalEntry } from "../lib/ledgerService";
+import { recordTeacherEarningForOrder } from "../lib/teacherWalletService";
 
 const router = Router();
 
@@ -76,6 +78,29 @@ router.post(
         });
         // الطلب يصبح PAID
         await tx.order.update({ where: { id: payment.orderId }, data: { status: "PAID" } });
+
+        // تسجيل قيد الإيداع البنكي الأولي في دفتر الأستاذ المزدوج
+        await recordJournalEntry(
+          {
+            type: "PAYMENT_DEPOSIT",
+            narrativeAr: `إيداع دفعة بنكية معتمدة للطلب ${payment.order.orderNo} بمبلغ ${payment.order.amount} ريال`,
+            narrativeEn: `Deposit for approved payment of order ${payment.order.orderNo}`,
+            referenceType: "PAYMENT",
+            referenceId: payment.id,
+            createdById: req.user!.id,
+            currency: "SAR",
+            lines: [
+              { accountCode: "1010", entryType: "DEBIT", amount: payment.order.amount, userId: payment.order.studentId },
+              { accountCode: "2010", entryType: "CREDIT", amount: payment.order.amount, userId: payment.order.studentId },
+            ],
+          },
+          tx
+        );
+
+        // تسجيل استحقاق المدرس وتثبيت نسبة العمولة اللحظية (Snapshot) إن كان للطلب مدرس
+        if (payment.order.providerId) {
+          await recordTeacherEarningForOrder(payment.orderId, tx);
+        }
       });
 
       // منح الوصول حسب نوع الهدف (خارج المعاملة لكن ذري)

@@ -207,6 +207,11 @@ model User {
   oauthAccounts    OAuthAccount[]
   authTokens       AuthToken[]
   auditLogs        AuditLog[]
+  refundsRequested       RefundRequest[]         @relation("StudentRefunds")
+  refundsReviewed        RefundRequest[]         @relation("RefundReviewer")
+  withdrawalsReviewed    TeacherWithdrawal[]     @relation("WithdrawalReviewer")
+  journalEntriesCreated  FinancialJournalEntry[] @relation("JournalCreator")
+  ledgerLines            FinancialLedgerLine[]   @relation("LedgerUser")
 
   @@index([role])
   @@index([status])
@@ -312,6 +317,9 @@ model TeacherProfile {
   ads          Ad[]
   liveSessions LiveSession[]
   providedOrders Order[]        @relation("OrderProvider")
+  payoutMethods  TeacherPayoutMethod[]
+  withdrawals    TeacherWithdrawal[]
+  earnings       TeacherEarning[]
 
   @@index([status])
 }
@@ -545,6 +553,8 @@ model Order {
   payments     Payment[]
   chatRooms    ChatRoom[]      @relation("RoomOrder")
   liveBookings LiveBooking[]   @relation("BookingOrder")
+  refundRequests  RefundRequest[]
+  teacherEarnings TeacherEarning[]
 
   @@index([studentId])
   @@index([status])
@@ -862,5 +872,245 @@ model SecurityIncident {
   @@index([createdAt])
   @@index([resolved])
 }
+
+// ============================================================
+// النظام المالي والمحفظة ودفتر الأستاذ المزدوج (Double-Entry Ledger)
+// ============================================================
+
+enum FinancialAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryType {
+  PAYMENT_DEPOSIT
+  EARNING_REALIZATION
+  WITHDRAWAL_RESERVE
+  WITHDRAWAL_PAYOUT
+  WITHDRAWAL_RELEASE
+  REFUND_APPROVE
+  REFUND_PAYOUT
+  ADJUSTMENT
+}
+
+enum JournalEntryStatus {
+  POSTED
+  REVERSED
+}
+
+enum DebitCredit {
+  DEBIT
+  CREDIT
+}
+
+enum WithdrawalStatus {
+  PENDING
+  UNDER_REVIEW
+  NEEDS_INFORMATION
+  APPROVED
+  PROCESSING
+  PAID
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  UNDER_REVIEW
+  NEEDS_INFORMATION
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PROCESSING
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+  CANCELLED
+}
+
+enum EarningStatus {
+  PENDING_CLEARING
+  AVAILABLE
+  WITHDRAWN
+  REVERSED
+}
+
+model FinancialAccount {
+  id          String               @id @default(cuid())
+  code        String               @unique // 1010, 2010, 2020, 2021, 2030, 4010, 5010
+  nameAr      String
+  nameEn      String
+  type        FinancialAccountType
+  description String?
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+
+  ledgerLines FinancialLedgerLine[]
+
+  @@index([type])
+  @@index([isActive])
+}
+
+model FinancialJournalEntry {
+  id            String             @id @default(cuid())
+  entryNo       String             @unique // e.g. JRN-2026-000001
+  type          JournalEntryType
+  status        JournalEntryStatus @default(POSTED)
+  currency      String             @default("SAR")
+  totalAmount   Float              // مجموع الجانب المدين (ويساوي الدائن)
+  referenceType String?            // ORDER, PAYMENT, REFUND, WITHDRAWAL
+  referenceId   String?
+  narrativeAr   String
+  narrativeEn   String?
+  createdById   String?
+  createdAt     DateTime           @default(now())
+
+  createdBy   User?                 @relation("JournalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines       FinancialLedgerLine[]
+  refunds     RefundRequest[]
+  withdrawals TeacherWithdrawal[]
+
+  @@index([type])
+  @@index([status])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model FinancialLedgerLine {
+  id             String      @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  entryType      DebitCredit // DEBIT / CREDIT
+  amount         Float
+  currency       String      @default("SAR")
+  userId         String?     // الحساب الفرعي للطالب أو المدرس للتدقيق (Sub-ledger)
+  notes          String?
+  createdAt      DateTime    @default(now())
+
+  journalEntry FinancialJournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      FinancialAccount      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  user         User?                 @relation("LedgerUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@index([userId])
+  @@index([entryType])
+}
+
+model TeacherPayoutMethod {
+  id                     String   @id @default(cuid())
+  teacherId              String
+  bankName               String
+  accountHolderName      String
+  ibanEncrypted          String   // مشفر بـ AES-256-GCM (iv:authTag:ciphertext)
+  ibanMasked             String   // SA****************1234
+  accountNumberEncrypted  String?  // اختياري مشفر
+  accountNumberMasked    String?  // اختياري مقنع
+  isDefault              Boolean  @default(false)
+  isVerified             Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  teacher     TeacherProfile      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  withdrawals TeacherWithdrawal[]
+
+  @@index([teacherId])
+  @@index([isDefault])
+}
+
+model TeacherWithdrawal {
+  id                  String           @id @default(cuid())
+  withdrawalNo        String           @unique // e.g. WTH-2026-000001
+  teacherId           String
+  payoutMethodId      String
+  amount              Float
+  fee                 Float            @default(0)
+  netAmount           Float
+  currency            String           @default("SAR")
+  status              WithdrawalStatus @default(PENDING)
+  adminNotes          String?
+  rejectionReason     String?
+  transferProofUrl    String?          // صورة إشعار الحوالة البنكية
+  transferReferenceNo String?          // الرقم المرجعي للحوالة البنكية الصادرة من حساب المنصة
+  transferredAt       DateTime?
+  reviewerId          String?
+  executedById        String?
+  journalEntryId      String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  teacher      TeacherProfile         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  payoutMethod TeacherPayoutMethod    @relation(fields: [payoutMethodId], references: [id], onDelete: Restrict)
+  reviewer     User?                  @relation("WithdrawalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  journalEntry FinancialJournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  @@index([teacherId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RefundRequest {
+  id                  String       @id @default(cuid())
+  refundNo            String       @unique // e.g. RFD-2026-000001
+  orderId             String
+  studentId           String
+  amountRequested     Float
+  amountApproved      Float?
+  currency            String       @default("SAR")
+  reason              String
+  notes               String?
+  attachments         Json?
+  status              RefundStatus @default(PENDING)
+  adminNotes          String?
+  rejectionReason     String?
+  transferProofUrl    String?      // صورة إشعار التحويل البنكي المرجع للطالب
+  transferReferenceNo String?      // الرقم المرجعي للحوالة البنكية المستردة
+  transferredAt       DateTime?
+  bankDetails         Json?        // بيانات حساب الطالب المشفرة/المقنعة لتحويل الاسترداد
+  reviewerId          String?
+  executedById        String?
+  journalEntryId      String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  order        Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  student      User                   @relation("StudentRefunds", fields: [studentId], references: [id], onDelete: Cascade)
+  reviewer     User?                  @relation("RefundReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  journalEntry FinancialJournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([studentId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TeacherEarning {
+  id               String        @id @default(cuid())
+  orderId          String
+  teacherId        String
+  grossAmount      Float
+  commissionRate   Float         // لقطة النسبة الثابتة وقت الاستحقاق
+  commissionAmount Float
+  netAmount        Float
+  currency         String        @default("SAR")
+  status           EarningStatus @default(AVAILABLE)
+  clearingDate     DateTime?     // موعد إتاحة الرصيد للسحب
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  // يدعم طلبات متعددة المدرسين ويمنع تكرار استحقاق نفس المدرس لنفس الطلب:
+  @@unique([orderId, teacherId])
+  @@index([teacherId])
+  @@index([orderId])
+  @@index([status])
+}
+
 
 
