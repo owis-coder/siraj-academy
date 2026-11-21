@@ -313,6 +313,107 @@ export interface Service {
   isFeatured?: boolean;
 }
 
+export type RefundStatus =
+  | 'PENDING'
+  | 'UNDER_REVIEW'
+  | 'NEEDS_INFORMATION'
+  | 'APPROVED'
+  | 'PARTIALLY_APPROVED'
+  | 'REJECTED'
+  | 'PROCESSING'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export type WithdrawalStatus =
+  | 'PENDING'
+  | 'UNDER_REVIEW'
+  | 'NEEDS_INFORMATION'
+  | 'APPROVED'
+  | 'PROCESSING'
+  | 'PAID'
+  | 'REJECTED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface RefundRequest {
+  id: string;
+  refundNo: string;
+  orderId: string;
+  studentId: string;
+  amountRequested: number;
+  amountApproved: number | null;
+  currency: string;
+  reason: string;
+  notes: string | null;
+  attachments?: unknown;
+  status: RefundStatus;
+  adminNotes: string | null;
+  rejectionReason: string | null;
+  transferProofUrl: string | null;
+  transferReferenceNo: string | null;
+  transferredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: { id: string; fullName: string; username: string; email: string; whatsapp?: string };
+  order?: { id: string; orderNo: string; title: string; amount: number; targetType: string };
+  reviewer?: { id: string; fullName: string };
+}
+
+export interface TeacherPayoutMethod {
+  id: string;
+  bankName: string;
+  accountHolderName: string;
+  ibanMasked: string;
+  isDefault: boolean;
+  isVerified?: boolean;
+  createdAt?: string;
+}
+
+export interface TeacherWithdrawal {
+  id: string;
+  withdrawalNo: string;
+  teacherId: string;
+  payoutMethodId: string;
+  amount: number;
+  fee: number;
+  netAmount: number;
+  currency: string;
+  status: WithdrawalStatus;
+  adminNotes: string | null;
+  rejectionReason: string | null;
+  transferProofUrl: string | null;
+  transferReferenceNo: string | null;
+  transferredAt: string | null;
+  createdAt: string;
+  teacher?: { user?: { fullName: string; email: string; username?: string; whatsapp?: string } };
+  payoutMethod?: { bankName: string; accountHolderName: string; ibanMasked: string };
+  reviewer?: { fullName: string };
+}
+
+export interface TeacherWalletSummary {
+  teacherId: string;
+  currency: string;
+  availableBalance: number;
+  reservedBalance: number;
+  earnedTotal: number;
+  withdrawnTotal: number;
+  pendingClearing: number;
+  payoutMethods: TeacherPayoutMethod[];
+  recentEarnings: Array<{
+    id: string;
+    grossAmount: number;
+    commissionRate: number;
+    commissionAmount: number;
+    netAmount: number;
+    status: string;
+    createdAt: string;
+    order?: { orderNo: string; title: string };
+  }>;
+  recentWithdrawals: TeacherWithdrawal[];
+}
+
 export type RequestStatus = 'PENDING_REVIEW' | 'OPEN' | 'TEACHER_SELECTED' | 'CLOSED' | 'REJECTED';
 
 export interface ExplainRequest {
@@ -917,5 +1018,32 @@ export const api = {
       resolveIncident: (id: string) =>
         request<{ message: string }>(`/admin/security/incidents/${id}/resolve`, { method: 'POST' }),
     },
+  },
+  refunds: {
+    eligible: () => request<Array<{ id: string; orderNo: string; title: string; amount: number; targetType: string; maxRefundable: number; alreadyRefunded: number; paidAt: string }>>('/refunds/eligible'),
+    check: (orderId: string) => request<{ isEligible: boolean; reason?: string; maxRefundable: number; totalPaid: number; alreadyRefunded: number }>(`/refunds/check/${orderId}`),
+    submit: (body: { orderId: string; amountRequested: number; reason: string; notes?: string; attachments?: string[]; bankName?: string; iban?: string; accountHolderName?: string }) =>
+      request<RefundRequest>('/refunds', { method: 'POST', body }),
+    mine: () => request<RefundRequest[]>('/refunds/mine'),
+    cancel: (id: string) => request<RefundRequest>(`/refunds/${id}/cancel`, { method: 'PATCH' }),
+    adminList: (query?: { status?: string; page?: number; limit?: number }) => request<RefundRequest[]>('/refunds/admin/all', { query }),
+    adminReview: (id: string, body: { decision: 'APPROVED' | 'PARTIALLY_APPROVED' | 'REJECTED' | 'NEEDS_INFORMATION'; amountApproved?: number; adminNotes?: string; rejectionReason?: string }) =>
+      request<RefundRequest>(`/refunds/admin/${id}/review`, { method: 'PATCH', body }),
+    adminExecute: (id: string, body: { transferProofUrl: string; transferReferenceNo: string; transferredAt?: string; adminNotes?: string }) =>
+      request<RefundRequest>(`/refunds/admin/${id}/execute`, { method: 'POST', body }),
+  },
+  withdrawals: {
+    wallet: () => request<TeacherWalletSummary>('/withdrawals/teacher/wallet'),
+    payoutMethods: () => request<TeacherPayoutMethod[]>('/withdrawals/teacher/payout-methods'),
+    addPayoutMethod: (body: { bankName: string; accountHolderName: string; iban: string; isDefault?: boolean }) =>
+      request<TeacherPayoutMethod>('/withdrawals/teacher/payout-methods', { method: 'POST', body }),
+    withdraw: (body: { amount: number; payoutMethodId: string; adminNotes?: string }) =>
+      request<TeacherWithdrawal>('/withdrawals/teacher/withdraw', { method: 'POST', body }),
+    history: () => request<TeacherWithdrawal[]>('/withdrawals/teacher/history'),
+    adminList: (query?: { status?: string; page?: number; limit?: number }) => request<TeacherWithdrawal[]>('/withdrawals/admin/all', { query }),
+    adminReview: (id: string, body: { decision: 'APPROVED' | 'REJECTED'; adminNotes?: string; rejectionReason?: string }) =>
+      request<TeacherWithdrawal>(`/withdrawals/admin/${id}/review`, { method: 'PATCH', body }),
+    adminExecute: (id: string, body: { transferProofUrl: string; transferReferenceNo: string; transferredAt?: string; adminNotes?: string }) =>
+      request<TeacherWithdrawal>(`/withdrawals/admin/${id}/execute`, { method: 'POST', body }),
   },
 };
