@@ -125,29 +125,60 @@ export function AccountMenu() {
   const [showHint, setShowHint] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
+  const dismissHint = () => {
+    setShowHint(false);
+    if (user?.id) {
+      try {
+        localStorage.setItem(`siraj_account_hint_seen_${user.id}`, 'true');
+      } catch {
+        /* تجاهل التخزين المحلي */
+      }
+    }
+  };
+
   useEffect(() => {
-    // إظهار تلميح القائمة المنسدلة عند التحويل للشاشة الرئيسية بعد الدخول أو التسجيل
+    if (!user) return;
+    try {
+      const hasSeen = localStorage.getItem(`siraj_account_hint_seen_${user.id}`) === 'true';
+      if (hasSeen) {
+        setShowHint(false);
+        sessionStorage.removeItem('siraj_account_hint');
+        return;
+      }
+    } catch {
+      /* تجاهل التخزين المحلي */
+    }
+
+    // إظهار تلميح القائمة المنسدلة مرة واحدة فقط عند الدخول أو التسجيل
     const pendingSession = sessionStorage.getItem('siraj_account_hint') === 'pending';
     const pendingState = (location.state as { showAccountHint?: boolean } | null)?.showAccountHint;
 
     if (pendingSession || pendingState) {
       sessionStorage.removeItem('siraj_account_hint');
+      if (pendingState) {
+        window.history.replaceState({}, document.title);
+      }
+      try {
+        localStorage.setItem(`siraj_account_hint_seen_${user.id}`, 'true');
+      } catch {
+        /* تجاهل التخزين المحلي */
+      }
       setShowHint(true);
     }
-  }, [location.state]);
+  }, [user, location.state]);
 
   useEffect(() => {
     if (!open && !showHint) return;
     const onDown = (e: MouseEvent) => {
       if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setShowHint(false);
+        dismissHint();
       }
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false);
-        setShowHint(false);
+        dismissHint();
       }
     };
     document.addEventListener('mousedown', onDown);
@@ -156,7 +187,7 @@ export function AccountMenu() {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open, showHint]);
+  }, [open, showHint, user?.id]);
 
   if (!user) return null;
 
@@ -168,7 +199,7 @@ export function AccountMenu() {
       <button
         type="button"
         onClick={() => {
-          setShowHint(false);
+          dismissHint();
           setOpen((v) => !v);
         }}
         aria-haspopup="menu"
@@ -211,7 +242,7 @@ export function AccountMenu() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowHint(false)}
+                onClick={dismissHint}
                 className="grid size-6 place-items-center rounded-md text-ink-muted hover:bg-elevated hover:text-ink-primary"
                 title="إغلاق"
               >
@@ -227,7 +258,7 @@ export function AccountMenu() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowHint(false);
+                  dismissHint();
                   setOpen(true);
                 }}
                 className="rounded-lg bg-gold-500/20 px-3 py-1.5 text-xs font-semibold text-gold-300 transition-colors hover:bg-gold-500/30"
@@ -236,7 +267,7 @@ export function AccountMenu() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowHint(false)}
+                onClick={dismissHint}
                 className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-elevated hover:text-ink-primary"
               >
                 حسناً، فهمت
