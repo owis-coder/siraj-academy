@@ -228,6 +228,7 @@ export default function App() {
               }
             >
               <Route index element={<AdminHome />} />
+              <Route path="chat" element={<ChatPage />} />
               <Route path="universities" element={<AdminCrud cfg={UNIS_CFG} />} />
               <Route path="colleges" element={<AdminColleges />} />
               <Route path="majors" element={<AdminMajors />} />

@@ -46,6 +46,7 @@ function linksFor(role: 'STUDENT' | 'TEACHER' | 'ADMIN'): MenuLink[] {
     return [
       ...profile,
       { to: '/admin', labelKey: 'account.adminDashboard', icon: IconDashboard },
+      { to: '/admin/chat', labelKey: 'account.messages', icon: IconChat },
       { to: '/admin/audit', labelKey: 'account.auditLog', icon: IconAudit },
       notifications,
     ];

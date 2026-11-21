@@ -53,8 +53,12 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
   };
 
   if (!room) return <EmptyState title={t('chat.pickRoom')} hint={t('chat.pickRoomHint')} compact />;
-  const peer = (room.participants ?? []).find((p: User) => (p.id || (p as { userId?: string }).userId) !== user?.id);
-  const isSupport = room.isSupport || (room.participants ?? []).some((p) => p.role === 'ADMIN' || (p as { username?: string }).username === 'siraj_support');
+  const isAdminViewer = user?.role === 'ADMIN';
+  const peer = (room.participants ?? []).find(
+    (p: User) => (p.id || (p as { userId?: string }).userId) !== user?.id && (!isAdminViewer || p.role !== 'ADMIN')
+  ) ?? (room.participants ?? []).find((p: User) => (p.id || (p as { userId?: string }).userId) !== user?.id);
+
+  const isSupport = !isAdminViewer && (room.isSupport || (room.participants ?? []).some((p) => p.role === 'ADMIN' || (p as { username?: string }).username === 'siraj_support'));
 
   return (
     <div className="flex h-[calc(100vh-190px)] min-h-96 flex-col rounded-lg border border-line bg-surface">
@@ -73,8 +77,19 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
           <div>
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold">
-                {isSupport ? 'الدعم الفني — أكاديمية سراج' : (room.title ?? peer?.fullName ?? t('chat.fallback'))}
+                {isAdminViewer
+                  ? (peer ? `${peer.fullName}` : room.title)
+                  : isSupport
+                    ? 'الدعم الفني — أكاديمية سراج'
+                    : (room.title ?? peer?.fullName ?? t('chat.fallback'))}
               </p>
+              {isAdminViewer && peer && (
+                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold ${
+                  peer.role === 'TEACHER' ? 'bg-teal/15 text-teal' : 'bg-gold-500/15 text-gold-300'
+                }`}>
+                  {peer.role === 'TEACHER' ? 'مدرّس' : 'طالب'}
+                </span>
+              )}
               {isSupport && (
                 <span className="inline-flex items-center gap-1 rounded bg-teal/15 px-2 py-0.5 text-[10px] font-bold text-teal">
                   <span className="size-1.5 rounded-full bg-teal animate-pulse" />
@@ -83,9 +98,11 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
               )}
             </div>
             <p className="text-[11px] text-ink-muted">
-              {isSupport
-                ? 'فريق الدعم الرسمي • متواجدون لمساعدتك والإجابة على أي استفسار'
-                : (room.type === 'DIRECT' ? t('chat.direct') : t('chat.group'))}
+              {isAdminViewer
+                ? `محادثة دعم فني مباشر مع ${peer?.fullName ?? 'المستخدم'} • @${peer?.username ?? ''}`
+                : isSupport
+                  ? 'فريق الدعم الرسمي • متواجدون لمساعدتك والإجابة على أي استفسار'
+                  : (room.type === 'DIRECT' ? t('chat.direct') : t('chat.group'))}
             </p>
           </div>
         </div>
@@ -96,13 +113,18 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
         {msgs.length === 0 && !loading && <p className="py-10 text-center text-sm text-ink-muted">{t('chat.noMessages')}</p>}
         {msgs.map((m) => {
           const mine = m.senderId === user?.id;
-          const isSenderSupport = (m.sender as { role?: string; username?: string })?.role === 'ADMIN' || (m.sender as { role?: string; username?: string })?.username === 'siraj_support' || (!mine && isSupport);
+          const isSenderSupport = (m.sender as { role?: string; username?: string })?.role === 'ADMIN' || (m.sender as { role?: string; username?: string })?.username === 'siraj_support';
           return (
             <div key={m.id} className={`flex ${mine ? 'flex-row-reverse justify-start' : ''}`}>
               <div className={`max-w-[75%] rounded-lg px-4 py-2.5 text-sm leading-6 ${mine ? 'border border-gold/30 bg-gold-500/15' : isSenderSupport ? 'border border-gold-500/30 bg-surface-2' : 'border border-line bg-elevated'}`}>
                 {!mine && isSenderSupport && (
                   <span className="mb-1.5 inline-flex items-center gap-1 rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-300">
                     الدعم الفني
+                  </span>
+                )}
+                {!mine && !isSenderSupport && isAdminViewer && m.sender?.fullName && (
+                  <span className="mb-1.5 block text-[10px] font-bold text-ink-secondary">
+                    {m.sender.fullName}
                   </span>
                 )}
                 {m.body && <p className="whitespace-pre-line text-ink-primary">{m.body}</p>}

@@ -159,6 +159,8 @@ export function ChatPage() {
   const [active, setActive] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isAdminViewer = user?.role === 'ADMIN';
+
   useEffect(() => {
     api.chat.rooms().then(({ data }) => {
       const rs = (data ?? []) as ChatRoom[];
@@ -173,8 +175,14 @@ export function ChatPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">{t('sd.chatsTitle')}</h1>
-        <p className="mt-1 text-xs text-ink-muted">تواصل مباشرة مع الدعم الفني للأكاديمية، أو مع المدرسين والطلاب</p>
+        <h1 className="text-2xl font-bold">
+          {isAdminViewer ? 'محادثات الدعم الفني والرسائل' : t('sd.chatsTitle')}
+        </h1>
+        <p className="mt-1 text-xs text-ink-muted">
+          {isAdminViewer
+            ? 'متابعة استفسارات الطلاب والمدرسين والرد المباشر عليهم كفريق دعم رسمي'
+            : 'تواصل مباشرة مع الدعم الفني للأكاديمية، أو مع المدرسين والطلاب'}
+        </p>
       </div>
       {loading ? <Skeleton className="h-80 w-full" /> : rooms.length === 0 ? (
         <EmptyState title={t('sd.ordersEmptyTitle')} hint={t('sd.chatsEmptyHint')} />
@@ -182,11 +190,18 @@ export function ChatPage() {
         <div className="flex h-[580px] gap-4">
           <div className="flex w-64 shrink-0 flex-col gap-1.5 overflow-y-auto">
             {rooms.map((r) => {
-              const isSupport = r.isSupport || (r.participants ?? []).some((p) => p.role === 'ADMIN' || (p as { username?: string }).username === 'siraj_support');
-              const peer = (r.participants ?? []).find((p) => (p.id || (p as { userId?: string }).userId) !== user?.id);
-              const displayName = isSupport
-                ? 'الدعم الفني — أكاديمية سراج'
-                : (r.title ?? peer?.fullName ?? t('sd.conversation'));
+              const peer = (r.participants ?? []).find(
+                (p) => (p.id || (p as { userId?: string }).userId) !== user?.id && (!isAdminViewer || p.role !== 'ADMIN')
+              ) ?? (r.participants ?? []).find((p) => (p.id || (p as { userId?: string }).userId) !== user?.id);
+
+              const isSupport = !isAdminViewer && (r.isSupport || (r.participants ?? []).some((p) => p.role === 'ADMIN' || (p as { username?: string }).username === 'siraj_support'));
+
+              const displayName = isAdminViewer
+                ? (peer ? `${peer.fullName}` : (r.title ?? t('sd.conversation')))
+                : isSupport
+                  ? 'الدعم الفني — أكاديمية سراج'
+                  : (r.title ?? peer?.fullName ?? t('sd.conversation'));
+
               const isCurrent = r.id === active;
 
               return (
@@ -206,6 +221,13 @@ export function ChatPage() {
                       {isSupport && (
                         <span className="inline-flex shrink-0 items-center rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-300">
                           الدعم الفني
+                        </span>
+                      )}
+                      {isAdminViewer && peer && (
+                        <span className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                          peer.role === 'TEACHER' ? 'bg-teal/15 text-teal' : 'bg-gold-500/15 text-gold-300'
+                        }`}>
+                          {peer.role === 'TEACHER' ? 'مدرّس' : 'طالب'}
                         </span>
                       )}
                       <span className="truncate font-semibold">{displayName}</span>

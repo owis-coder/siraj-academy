@@ -32,62 +32,123 @@ router.get(
     let supportUser = null;
     try {
       supportUser = await getOrCreateSupportUser();
-      if (req.user!.id !== supportUser.id) {
+      if (req.user!.role !== "ADMIN" && req.user!.id !== supportUser.id) {
         await ensureUserSupportRoom(req.user!);
       }
     } catch {
       // عدم تعطيل قائمة المحادثات في حال حدوث أي خطأ غير متوقع
     }
 
-    const mine = await prisma.chatParticipant.findMany({
-      where: { userId: req.user!.id },
-      include: {
-        room: {
-          include: {
-            participants: { include: { user: { select: { id: true, fullName: true, username: true, role: true } } } },
-            messages: { orderBy: { createdAt: "desc" }, take: 1, include: { sender: { select: { fullName: true } } } },
+    const supportId = supportUser?.id;
+    const isAdmin = req.user!.role === "ADMIN";
+
+    let roomEntries: { room: any; lastReadAt: Date | null }[] = [];
+
+    if (isAdmin) {
+      // للأدمن: جلب كافة محادثات الدعم الفني مع جميع الطلاب والمدرسين + أي محادثة يشارك بها الأدمن
+      const allRooms = (await prisma.chatRoom.findMany({
+        where: {
+          OR: [
+            { participants: { some: { userId: req.user!.id } } },
+            ...(supportId ? [{ participants: { some: { userId: supportId } } }] : []),
+            { participants: { some: { user: { role: "ADMIN" } } } },
+          ],
+        },
+        include: {
+          participants: { include: { user: { select: { id: true, fullName: true, username: true, role: true } } } },
+          messages: { orderBy: { createdAt: "desc" }, take: 1, include: { sender: { select: { fullName: true } } } },
+        },
+        orderBy: { createdAt: "desc" },
+      })) as any[];
+
+      roomEntries = await Promise.all(
+        allRooms.map(async (room: any) => {
+          const myParticipant = room.participants.find((p: any) => p.userId === req.user!.id);
+          let lastReadAt = myParticipant?.lastReadAt ?? null;
+          if (!myParticipant) {
+            const p = await prisma.chatParticipant.findUnique({
+              where: { roomId_userId: { roomId: room.id, userId: req.user!.id } },
+            });
+            lastReadAt = p?.lastReadAt ?? null;
+          }
+          return { room, lastReadAt };
+        })
+      );
+    } else {
+      const mine = await prisma.chatParticipant.findMany({
+        where: { userId: req.user!.id },
+        include: {
+          room: {
+            include: {
+              participants: { include: { user: { select: { id: true, fullName: true, username: true, role: true } } } },
+              messages: { orderBy: { createdAt: "desc" }, take: 1, include: { sender: { select: { fullName: true } } } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    const supportId = supportUser?.id;
+        orderBy: { createdAt: "desc" },
+      });
+      roomEntries = mine.map((p) => ({ room: p.room, lastReadAt: p.lastReadAt }));
+    }
 
     const rooms = await Promise.all(
-      mine.map(async (p) => {
+      roomEntries.map(async ({ room, lastReadAt }) => {
         const unread = await prisma.message.count({
           where: {
-            roomId: p.roomId,
-            createdAt: { gt: p.lastReadAt ?? (new Date(0)) },
+            roomId: room.id,
+            createdAt: { gt: lastReadAt ?? new Date(0) },
             senderId: { not: req.user!.id },
           },
         });
-        const isSupport = Boolean(supportId && p.room.participants.some((x) => x.user.id === supportId));
+        const isSupport = Boolean(supportId && room.participants.some((x: any) => x.user.id === supportId));
+
+        // تحديد عنوان المحادثة:
+        // إذا كان المستخدم طالب أو مدرس: يظهر عنوان "الدعم الفني — أكاديمية سراج"
+        // إذا كان المستخدم أدمن: يظهر اسم الطالب أو المدرس المستفسر بوضوح!
+        let title = room.title;
+        const peer =
+          room.participants.find((x: any) => x.user.id !== req.user!.id && x.user.role !== "ADMIN") ??
+          room.participants.find((x: any) => x.user.id !== req.user!.id);
+
+        if (isAdmin) {
+          if (peer) {
+            const roleBadge = peer.user.role === "TEACHER" ? "مدرّس" : "طالب";
+            title = `${peer.user.fullName} (${roleBadge})`;
+          } else {
+            title = room.title || "محادثة دعم";
+          }
+        } else if (isSupport) {
+          title = SUPPORT_FULL_NAME;
+        }
+
         return {
-          id: p.roomId,
-          type: p.room.type,
-          title: isSupport ? SUPPORT_FULL_NAME : p.room.title,
-          orderId: p.room.orderId,
-          myLastReadAt: p.lastReadAt,
+          id: room.id,
+          type: room.type,
+          title,
+          orderId: room.orderId,
+          myLastReadAt: lastReadAt,
           isSupport,
-          participants: p.room.participants.map((x) => ({
+          participants: room.participants.map((x: any) => ({
             id: x.user.id,
             userId: x.user.id,
             fullName: x.user.fullName,
             username: x.user.username,
             role: x.user.role,
           })),
-          lastMessage: p.room.messages[0]
-            ? { body: p.room.messages[0].body, sender: p.room.messages[0].sender.fullName, at: p.room.messages[0].createdAt }
+          lastMessage: room.messages[0]
+            ? { body: room.messages[0].body, sender: room.messages[0].sender.fullName, at: room.messages[0].createdAt }
             : null,
           unread,
         };
       }),
     );
 
-    // ترتيب المحادثات: وضع محادثة الدعم دائمًا في أول خانة
+    // ترتيب المحادثات: وضع محادثات الدعم الفني غير المقروءة أولاً للأدمن
     rooms.sort((a, b) => {
+      if (isAdmin) {
+        if (a.unread > 0 && b.unread === 0) return -1;
+        if (a.unread === 0 && b.unread > 0) return 1;
+        return 0;
+      }
       if (a.isSupport && !b.isSupport) return -1;
       if (!a.isSupport && b.isSupport) return 1;
       return 0;
