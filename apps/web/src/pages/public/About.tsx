@@ -2,15 +2,21 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui';
 import { FAQ } from './Faq';
 import { useI18n } from '../../i18n';
+import { useTheme } from '../../lib/theme';
 
 export default function About() {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const values = [1, 2, 3].map((n) => ({ key: n, t: t(`about.v${n}.t`), d: t(`about.v${n}.d`) }));
 
   return (
     <div className="container-x max-w-4xl py-12">
       <div className="mb-10 text-center">
-        <img src="/brand/logo-mark-transparent.png" alt={t('nav.logoAlt')} className="mx-auto mb-5 size-20" />
+        <img
+          src={theme === 'dark' ? '/brand/siraj-logo-full-dark.png' : '/brand/siraj-logo-full-light.png'}
+          alt={t('nav.logoAlt')}
+          className="mx-auto mb-6 h-32 sm:h-40 w-auto object-contain"
+        />
         <h1 className="text-4xl font-bold">
           {t('about.titlePrefix')} <span className="gold-text">{t('about.titleHighlight')}</span>
         </h1>

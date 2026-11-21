@@ -5,7 +5,7 @@ import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
 import { PublicLayout, StudentLayout, TeacherLayout, AdminLayout } from './components/layouts';
-import { ProtectedRoute } from './components/guards';
+import { ProtectedRoute, RoleRoute } from './components/guards';
 
 import Home from './pages/public/Home';
 import Universities from './pages/public/Universities';
@@ -180,9 +180,9 @@ export default function App() {
             <Route
               path="dashboard"
               element={
-                <ProtectedRoute>
+                <RoleRoute role="STUDENT">
                   <StudentLayout />
-                </ProtectedRoute>
+                </RoleRoute>
               }
             >
               <Route index element={<DashboardHome />} />
@@ -199,7 +199,14 @@ export default function App() {
             </Route>
 
             {/* ============ لوحة المدرّس ============ */}
-            <Route path="teacher" element={<TeacherLayout />}>
+            <Route
+              path="teacher"
+              element={
+                <RoleRoute role="TEACHER">
+                  <TeacherLayout />
+                </RoleRoute>
+              }
+            >
               <Route index element={<TeacherHome />} />
               <Route path="offerings" element={<TeacherOfferings />} />
               <Route path="requests" element={<TeacherRequests />} />
@@ -212,7 +219,14 @@ export default function App() {
             </Route>
 
             {/* ============ لوحة الإدارة ============ */}
-            <Route path="admin" element={<AdminLayout />}>
+            <Route
+              path="admin"
+              element={
+                <RoleRoute role="ADMIN">
+                  <AdminLayout />
+                </RoleRoute>
+              }
+            >
               <Route index element={<AdminHome />} />
               <Route path="universities" element={<AdminCrud cfg={UNIS_CFG} />} />
               <Route path="colleges" element={<AdminColleges />} />
