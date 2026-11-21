@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   api,
   type AdminUserListItem,
@@ -24,6 +24,11 @@ import {
   IconAudit,
   IconProhibited,
   IconTeachers,
+  IconGraduation,
+  IconSecurity,
+  IconArrowBack,
+  IconArrowForward,
+  IconWhatsapp,
 } from '../../../components/icons';
 
 export default function AdminUserManagement() {
@@ -55,13 +60,17 @@ export default function AdminUserManagement() {
   const [recoveryPage, setRecoveryPage] = useState(1);
   const [recoveryTotalPages, setRecoveryTotalPages] = useState(1);
 
-  // User Detail Drawer State
+  // User Detail Modal State
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [userDetail, setUserDetail] = useState<AdminUserDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailTab, setDetailTab] = useState<'overview' | 'security' | 'password_recovery' | 'alt_recovery' | 'audit'>('overview');
+  const [detailSection, setDetailSection] = useState<'general' | 'security' | 'password_recovery' | 'alt_recovery' | 'audit'>('general');
+  const [copiedId, setCopiedId] = useState(false);
 
-  // Edit Forms States
+  // Alternative Recovery Wizard Step (1: Info, 2: New Email, 3: Verification, 4: Review)
+  const [altStep, setAltStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Profile Edit Form States
   const [editFullName, setEditFullName] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [editLevel, setEditLevel] = useState('');
@@ -76,6 +85,7 @@ export default function AdminUserManagement() {
   const [newDirectEmail, setNewDirectEmail] = useState('');
   const [directEmailReason, setDirectEmailReason] = useState('');
   const [savingDirectEmail, setSavingDirectEmail] = useState(false);
+  const [showDirectEmailForm, setShowDirectEmailForm] = useState(false);
 
   // Role Change
   const [newRole, setNewRole] = useState<string>('');
@@ -87,6 +97,10 @@ export default function AdminUserManagement() {
   const [suspendReason, setSuspendReason] = useState('');
   const [suspending, setSuspending] = useState(false);
 
+  // Password Recovery Confirmation Dialog
+  const [showPasswordRecoveryConfirm, setShowPasswordRecoveryConfirm] = useState(false);
+  const [sendingRecoveryEmail, setSendingRecoveryEmail] = useState(false);
+
   // Alternative Recovery Form
   const [altEmail, setAltEmail] = useState('');
   const [altReason, setAltReason] = useState('');
@@ -95,11 +109,31 @@ export default function AdminUserManagement() {
   const [altEvidenceRef, setAltEvidenceRef] = useState('');
   const [submittingAltRecovery, setSubmittingAltRecovery] = useState(false);
 
-  // Review Modal State
+  // Review Modal State (Dual-Admin Approval)
   const [reviewRecoveryItem, setReviewRecoveryItem] = useState<AdminRecoveryItem | null>(null);
   const [reviewDecision, setReviewDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
   const [reviewNotes, setReviewNotes] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Lock background scroll when modal is active
+  useEffect(() => {
+    if (activeUserId || showSuspendModal || reviewRecoveryItem || showPasswordRecoveryConfirm) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [activeUserId, showSuspendModal, reviewRecoveryItem, showPasswordRecoveryConfirm]);
+
+  // Copy User ID
+  const copyUserId = useCallback((id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(true);
+    toast.push('info', lang === 'ar' ? 'تم نسخ معرّف الحساب' : 'User ID copied');
+    setTimeout(() => setCopiedId(false), 2000);
+  }, [lang, toast]);
 
   // Fetch Stats
   const loadStats = async () => {
@@ -231,7 +265,9 @@ export default function AdminUserManagement() {
   // Load User Detail
   const openUserDetail = async (id: string) => {
     setActiveUserId(id);
-    setDetailTab('overview');
+    setDetailSection('general');
+    setAltStep(1);
+    setShowDirectEmailForm(false);
     try {
       setLoadingDetail(true);
       const res = await api.admin.users.get(id);
@@ -270,11 +306,11 @@ export default function AdminUserManagement() {
         level: editLevel,
         bio: editBio,
       });
-      toast.push('success', 'تم تحديث الملف الشخصي بنجاح');
+      toast.push('success', lang === 'ar' ? 'تم تحديث الملف الشخصي بنجاح' : 'Profile updated successfully');
       openUserDetail(activeUserId);
       loadUsers();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تحديث الملف الشخصي');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل تحديث الملف الشخصي' : 'Failed to update profile'));
     } finally {
       setSavingProfile(false);
     }
@@ -287,11 +323,11 @@ export default function AdminUserManagement() {
     setSavingUsername(true);
     try {
       await api.admin.users.changeUsername(activeUserId, { username: newUsername });
-      toast.push('success', 'تم تغيير اسم المستخدم بنجاح');
+      toast.push('success', lang === 'ar' ? 'تم تغيير اسم المستخدم بنجاح' : 'Username changed successfully');
       openUserDetail(activeUserId);
       loadUsers();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تغيير اسم المستخدم');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل تغيير اسم المستخدم' : 'Failed to change username'));
     } finally {
       setSavingUsername(false);
     }
@@ -302,7 +338,7 @@ export default function AdminUserManagement() {
     e.preventDefault();
     if (!activeUserId) return;
     if (!newDirectEmail || !directEmailReason) {
-      toast.push('info', 'يرجى كتابة البريد الجديد والسبب الإداري');
+      toast.push('info', lang === 'ar' ? 'يرجى كتابة البريد الجديد والسبب الإداري' : 'Email and reason required');
       return;
     }
     setSavingDirectEmail(true);
@@ -311,13 +347,14 @@ export default function AdminUserManagement() {
         email: newDirectEmail,
         reason: directEmailReason,
       });
-      toast.push('success', 'تم تعديل البريد الإلكتروني بنجاح وتسجيل العملية');
+      toast.push('success', lang === 'ar' ? 'تم تعديل البريد الإلكتروني بنجاح وتسجيل العملية' : 'Email updated and logged');
       setNewDirectEmail('');
       setDirectEmailReason('');
+      setShowDirectEmailForm(false);
       openUserDetail(activeUserId);
       loadUsers();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تعديل البريد الإلكتروني');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل تعديل البريد الإلكتروني' : 'Failed to change email'));
     } finally {
       setSavingDirectEmail(false);
     }
@@ -327,17 +364,17 @@ export default function AdminUserManagement() {
   const handleSaveRole = async () => {
     if (!activeUserId) return;
     if (!roleConfirmed) {
-      toast.push('info', 'يرجى تأكيد الرغبة في تغيير دور المستخدم');
+      toast.push('info', lang === 'ar' ? 'يرجى تأكيد الرغبة في تغيير دور المستخدم' : 'Please confirm role change');
       return;
     }
     setSavingRole(true);
     try {
       await api.admin.users.changeRole(activeUserId, { role: newRole, confirm: true });
-      toast.push('success', `تم تغيير دور الحساب بنجاح إلى ${newRole}`);
+      toast.push('success', lang === 'ar' ? `تم تغيير دور الحساب بنجاح إلى ${newRole}` : `Role changed to ${newRole}`);
       openUserDetail(activeUserId);
       loadUsers();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تغيير دور الحساب');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل تغيير دور الحساب' : 'Failed to change role'));
     } finally {
       setSavingRole(false);
     }
@@ -346,20 +383,20 @@ export default function AdminUserManagement() {
   // Suspend User
   const handleSuspend = async () => {
     if (!activeUserId || !suspendReason) {
-      toast.push('info', 'يرجى توضيح سبب تعليق الحساب');
+      toast.push('info', lang === 'ar' ? 'يرجى توضيح سبب تعليق الحساب' : 'Suspension reason required');
       return;
     }
     setSuspending(true);
     try {
       await api.admin.users.suspend(activeUserId, { reason: suspendReason });
-      toast.push('success', 'تم تعليق الحساب وإنهاء جلساته بنجاح');
+      toast.push('success', lang === 'ar' ? 'تم تعليق الحساب وإنهاء جلساته بنجاح' : 'Account suspended successfully');
       setShowSuspendModal(false);
       setSuspendReason('');
       openUserDetail(activeUserId);
       loadUsers();
       loadStats();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تعليق الحساب');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل تعليق الحساب' : 'Failed to suspend account'));
     } finally {
       setSuspending(false);
     }
@@ -370,12 +407,12 @@ export default function AdminUserManagement() {
     if (!activeUserId) return;
     try {
       await api.admin.users.reactivate(activeUserId);
-      toast.push('success', 'تمت إعادة تفعيل الحساب بنجاح');
+      toast.push('success', lang === 'ar' ? 'تمت إعادة تفعيل الحساب بنجاح' : 'Account reactivated successfully');
       openUserDetail(activeUserId);
       loadUsers();
       loadStats();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل تفعيل الحساب');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل تفعيل الحساب' : 'Failed to reactivate account'));
     }
   };
 
@@ -384,23 +421,27 @@ export default function AdminUserManagement() {
     if (!activeUserId) return;
     try {
       await api.admin.users.revokeSessions(activeUserId);
-      toast.push('success', 'تم إسقاط وإلغاء كافة الجلسات النشطة للمستخدم بنجاح');
+      toast.push('success', lang === 'ar' ? 'تم إسقاط كافة الجلسات النشطة للمستخدم' : 'All active sessions revoked');
       openUserDetail(activeUserId);
       loadUsers();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل إلغاء الجلسات');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل إلغاء الجلسات' : 'Failed to revoke sessions'));
     }
   };
 
-  // Trigger Original Email Password Recovery
+  // Send Recovery Email
   const handleSendRecoveryEmail = async () => {
     if (!activeUserId) return;
+    setSendingRecoveryEmail(true);
     try {
       const res = await api.admin.users.sendRecoveryEmail(activeUserId);
-      toast.push('success', res.data?.message || 'تم إرسال رابط استعادة كلمة المرور إلى البريد المسجل بنجاح');
+      toast.push('success', res.data?.message || (lang === 'ar' ? 'تم إرسال رابط استعادة كلمة المرور بنجاح' : 'Recovery email sent successfully'));
+      setShowPasswordRecoveryConfirm(false);
       openUserDetail(activeUserId);
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل إرسال رابط استعادة كلمة المرور');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل إرسال رابط استعادة كلمة المرور' : 'Failed to send recovery email'));
+    } finally {
+      setSendingRecoveryEmail(false);
     }
   };
 
@@ -409,7 +450,7 @@ export default function AdminUserManagement() {
     e.preventDefault();
     if (!activeUserId) return;
     if (!altEmail || !altReason) {
-      toast.push('info', 'يرجى إدخال البريد البديل وسبب فقدان البريد الأصلي');
+      toast.push('info', lang === 'ar' ? 'يرجى إدخال البريد البديل وسبب الفقدان' : 'New email and reason required');
       return;
     }
     setSubmittingAltRecovery(true);
@@ -421,16 +462,17 @@ export default function AdminUserManagement() {
         verificationNotes: altNotes,
         evidenceRef: altEvidenceRef,
       });
-      toast.push('success', res.data?.message || 'تم إنشاء طلب الاستعادة بنجاح');
+      toast.push('success', res.data?.message || (lang === 'ar' ? 'تم تسجيل طلب الاستعادة بنجاح' : 'Recovery request created'));
       setAltEmail('');
       setAltReason('');
       setAltNotes('');
       setAltEvidenceRef('');
+      setAltStep(1);
       openUserDetail(activeUserId);
       loadStats();
       loadRecoveries();
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل إنشاء طلب استعادة الحساب');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل إنشاء طلب استعادة الحساب' : 'Failed to create recovery request'));
     } finally {
       setSubmittingAltRecovery(false);
     }
@@ -445,59 +487,68 @@ export default function AdminUserManagement() {
         decision: reviewDecision,
         notes: reviewNotes,
       });
-      toast.push('success', res.data?.message || 'تم اعتماد مراجعة الطلب بنجاح');
+      toast.push('success', res.data?.message || (lang === 'ar' ? 'تم اعتماد مراجعة الطلب بنجاح' : 'Review submitted successfully'));
       setReviewRecoveryItem(null);
       setReviewNotes('');
       loadRecoveries();
       loadStats();
       if (activeUserId) openUserDetail(activeUserId);
     } catch (err: any) {
-      toast.push('error', err.message || 'فشل اعتماد مراجعة الطلب');
+      toast.push('error', err.message || (lang === 'ar' ? 'فشل اعتماد مراجعة الطلب' : 'Failed to submit review'));
     } finally {
       setSubmittingReview(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Title & Breadcrumb */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Page Title & Main Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface border border-line rounded-2xl p-6 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-ink-primary">
-            {lang === 'ar' ? 'إدارة حسابات المستخدمين واستعادتها' : 'User Account Management & Recovery'}
-          </h1>
-          <p className="text-sm text-ink-muted mt-1">
-            {lang === 'ar'
-              ? 'إدارة شاملة لحسابات الطلاب والمدرسين، التوثيق، الصلاحيات، وإجراءات استعادة الحسابات الحساسة'
-              : 'Complete administration for student and teacher accounts, verification, permissions, and security recovery'}
-          </p>
+          <div className="flex items-center gap-2.5">
+            <div className="size-10 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-500 flex items-center justify-center">
+              <IconUser className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-ink-primary">
+                {lang === 'ar' ? 'إدارة حسابات المستخدمين واستعادتها' : 'User Account Management & Recovery'}
+              </h1>
+              <p className="text-xs sm:text-sm text-ink-muted mt-0.5">
+                {lang === 'ar'
+                  ? 'إدارة متكاملة لحسابات الطلاب والمدرسين، التحكم بالصلاحيات، ومسارات الاستعادة الآمنة'
+                  : 'Comprehensive administration for students, teachers, permissions, and security recovery'}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Main Tab Switcher */}
-        <div className="inline-flex rounded-xl bg-surface border border-line p-1 shadow-sm">
+        {/* Main Tab Segmented Control */}
+        <div className="inline-flex rounded-xl bg-elevated/60 border border-line p-1 shadow-inner self-start md:self-center">
           <button
             type="button"
             onClick={() => setMainTab('users')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
               mainTab === 'users'
-                ? 'bg-gold-500 text-slate-950 shadow'
+                ? 'bg-surface text-gold-500 shadow-sm border border-line/60'
                 : 'text-ink-secondary hover:text-ink-primary'
             }`}
           >
-            {lang === 'ar' ? 'دليل المستخدمين' : 'User Directory'}
+            <IconUser className="size-3.5" />
+            <span>{lang === 'ar' ? 'دليل المستخدمين' : 'User Directory'}</span>
           </button>
           <button
             type="button"
             onClick={() => setMainTab('recoveries')}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition relative ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 relative ${
               mainTab === 'recoveries'
-                ? 'bg-gold-500 text-slate-950 shadow'
+                ? 'bg-surface text-gold-500 shadow-sm border border-line/60'
                 : 'text-ink-secondary hover:text-ink-primary'
             }`}
           >
+            <IconShieldKeyhole className="size-3.5" />
             <span>{lang === 'ar' ? 'طلبات الاستعادة' : 'Recovery Requests'}</span>
             {displayStats.pendingRecoveriesCount > 0 && (
-              <span className="ms-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-bold">
+              <span className="ms-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-extrabold animate-pulse">
                 {displayStats.pendingRecoveriesCount}
               </span>
             )}
@@ -505,34 +556,34 @@ export default function AdminUserManagement() {
         </div>
       </div>
 
-      {/* Stats Counter Bar */}
+      {/* KPI Stats Counter Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'إجمالي المستخدمين' : 'Total Users'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-gold-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'إجمالي المستخدمين' : 'Total Users'}</div>
           <div className="text-xl font-bold text-ink-primary mt-1">{displayStats.totalUsers}</div>
         </div>
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'الطلاب' : 'Students'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-sky-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'الطلاب' : 'Students'}</div>
           <div className="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1">{displayStats.studentsCount}</div>
         </div>
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'المدرسون' : 'Teachers'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-emerald-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'المدرسون' : 'Teachers'}</div>
           <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{displayStats.teachersCount}</div>
         </div>
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'الحسابات النشطة' : 'Active'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-emerald-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'حسابات نشطة' : 'Active'}</div>
           <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{displayStats.activeCount}</div>
         </div>
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'الحسابات المعلقة' : 'Suspended'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-rose-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'حسابات معلقة' : 'Suspended'}</div>
           <div className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">{displayStats.suspendedCount}</div>
         </div>
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'بريد غير موثق' : 'Unverified Email'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-amber-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'بريد غير موثق' : 'Unverified Email'}</div>
           <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">{displayStats.unverifiedCount}</div>
         </div>
-        <div className="bg-surface border border-line rounded-xl p-3 shadow-sm">
-          <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'بانتظار الاعتماد' : 'Pending Approval'}</div>
+        <div className="bg-surface border border-line rounded-xl p-3.5 shadow-sm hover:border-rose-500/30 transition">
+          <div className="text-[11px] font-medium text-ink-muted">{lang === 'ar' ? 'بانتظار الاعتماد' : 'Pending Approval'}</div>
           <div className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">{displayStats.pendingRecoveriesCount}</div>
         </div>
       </div>
@@ -541,7 +592,7 @@ export default function AdminUserManagement() {
       {mainTab === 'users' && (
         <div className="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
           {/* Filters & Search Toolbar */}
-          <div className="p-4 border-b border-line flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-elevated/30">
+          <div className="p-4 border-b border-line flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-elevated/20">
             {/* Search Input */}
             <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
               <input
@@ -553,7 +604,7 @@ export default function AdminUserManagement() {
                     ? 'بحث بالاسم، اسم المستخدم، البريد أو المعرف...'
                     : 'Search name, username, email, ID...'
                 }
-                className="w-full ltr:pl-9 rtl:pr-9 ltr:pr-4 rtl:pl-4 py-2 rounded-xl bg-surface border border-line text-sm text-ink-primary focus:border-gold-500 outline-none transition"
+                className="w-full ltr:pl-9 rtl:pr-9 ltr:pr-4 rtl:pl-4 h-10 rounded-xl bg-surface border border-line text-xs sm:text-sm text-ink-primary focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30 outline-none transition"
               />
               <span className="absolute inset-y-0 ltr:left-3 rtl:right-3 flex items-center text-ink-muted pointer-events-none">
                 <IconSearch className="size-4" />
@@ -568,7 +619,7 @@ export default function AdminUserManagement() {
                   setSelectedFilter(e.target.value);
                   setPage(1);
                 }}
-                className="px-3 py-2 rounded-xl bg-surface border border-line text-xs text-ink-primary outline-none focus:border-gold-500"
+                className="h-10 px-3 rounded-xl bg-surface border border-line text-xs font-medium text-ink-primary outline-none focus:border-gold-500 transition"
               >
                 <option value="all">{lang === 'ar' ? 'كافة الحسابات' : 'All Accounts'}</option>
                 <option value="students">{lang === 'ar' ? 'الطلاب فقط' : 'Students Only'}</option>
@@ -590,10 +641,11 @@ export default function AdminUserManagement() {
                   setPage(1);
                   loadUsers();
                 }}
-                className="p-2 rounded-xl bg-surface border border-line text-ink-secondary hover:text-ink-primary hover:bg-elevated transition"
+                className="h-10 px-3 rounded-xl bg-surface border border-line text-ink-secondary hover:text-ink-primary hover:bg-elevated transition flex items-center gap-1.5 text-xs font-semibold"
                 title={lang === 'ar' ? 'إعادة ضبط' : 'Reset'}
               >
                 <IconRefresh className="size-4" />
+                <span className="hidden sm:inline">{lang === 'ar' ? 'إعادة ضبط' : 'Reset'}</span>
               </button>
             </div>
           </div>
@@ -601,28 +653,28 @@ export default function AdminUserManagement() {
           {/* Users Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-start text-xs">
-              <thead className="bg-elevated/60 text-ink-muted border-b border-line uppercase font-semibold">
+              <thead className="bg-elevated/50 text-ink-muted border-b border-line uppercase font-semibold">
                 <tr>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'المستخدم' : 'User'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'الدور' : 'Role'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'الجلسات' : 'Sessions'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'تاريخ التسجيل' : 'Registered'}</th>
-                  <th className="py-3 px-4 text-center">{lang === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'المستخدم' : 'User'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'الدور' : 'Role'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'الجلسات' : 'Sessions'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'تاريخ التسجيل' : 'Registered'}</th>
+                  <th className="py-3.5 px-4 text-center">{lang === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
                 {loadingUsers ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-ink-secondary">
+                    <td colSpan={7} className="py-16 text-center text-ink-secondary">
                       <div className="inline-block size-6 border-2 border-gold-500 border-t-transparent rounded-full animate-spin mb-2" />
                       <div>{lang === 'ar' ? 'جاري تحميل المستخدمين...' : 'Loading users...'}</div>
                     </td>
                   </tr>
                 ) : (users || []).length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-ink-secondary">
+                    <td colSpan={7} className="py-16 text-center text-ink-secondary">
                       {lang === 'ar' ? 'لا توجد حسابات مطابقة لمعايير البحث' : 'No users match criteria'}
                     </td>
                   </tr>
@@ -630,17 +682,17 @@ export default function AdminUserManagement() {
                   (users || []).map((u) => (
                     <tr key={u.id} className="hover:bg-elevated/40 transition">
                       {/* Name & Username */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="size-9 rounded-xl bg-gold-500/10 text-gold-500 font-bold flex items-center justify-center text-sm border border-gold-500/20">
+                          <div className="size-9 rounded-xl bg-gold-500/10 text-gold-500 font-bold flex items-center justify-center text-sm border border-gold-500/20 shrink-0">
                             {u.fullName.slice(0, 1)}
                           </div>
                           <div>
                             <div className="font-semibold text-ink-primary flex items-center gap-1.5">
                               <span>{u.fullName}</span>
                               {u.recoveryRequestsCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
-                                  {lang === 'ar' ? 'طلب استعادة' : 'Recovery'}
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/20">
+                                  {lang === 'ar' ? 'استعادة نشطة' : 'Recovery'}
                                 </span>
                               )}
                             </div>
@@ -650,17 +702,17 @@ export default function AdminUserManagement() {
                       </td>
 
                       {/* Email & Verification */}
-                      <td className="py-3 px-4 font-mono">
+                      <td className="py-3.5 px-4 font-mono">
                         <div className="flex items-center gap-1.5">
                           <span className="text-ink-secondary">{u.email}</span>
                           {u.emailVerified ? (
-                            <span title={lang === 'ar' ? 'موثق' : 'Verified'} className="text-emerald-500">
+                            <span title={lang === 'ar' ? 'بريد موثق' : 'Verified'} className="text-emerald-500">
                               <IconCheck className="size-3.5" />
                             </span>
                           ) : (
                             <span
-                              title={lang === 'ar' ? 'غير موثق' : 'Unverified'}
-                              className="px-1 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600"
+                              title={lang === 'ar' ? 'بريد غير موثق' : 'Unverified'}
+                              className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-semibold"
                             >
                               !
                             </span>
@@ -669,7 +721,7 @@ export default function AdminUserManagement() {
                       </td>
 
                       {/* Role Badge */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
                             u.role === 'ADMIN'
@@ -680,59 +732,49 @@ export default function AdminUserManagement() {
                           }`}
                         >
                           {u.role === 'ADMIN'
-                            ? lang === 'ar'
-                              ? 'مدير نظام'
-                              : 'Admin'
+                            ? lang === 'ar' ? 'مدير نظام' : 'Admin'
                             : u.role === 'TEACHER'
-                            ? lang === 'ar'
-                              ? 'مدرس'
-                              : 'Teacher'
-                            : lang === 'ar'
-                            ? 'طالب'
-                            : 'Student'}
+                            ? lang === 'ar' ? 'مدرس' : 'Teacher'
+                            : lang === 'ar' ? 'طالب' : 'Student'}
                         </span>
                       </td>
 
                       {/* Status Badge */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] ${
                             u.status === 'ACTIVE'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                               : 'bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold border border-rose-500/30'
                           }`}
                         >
                           {u.status === 'ACTIVE'
-                            ? lang === 'ar'
-                              ? 'نشط'
-                              : 'Active'
-                            : lang === 'ar'
-                            ? 'معلق'
-                            : 'Suspended'}
+                            ? lang === 'ar' ? 'نشط' : 'Active'
+                            : lang === 'ar' ? 'معلق' : 'Suspended'}
                         </span>
                       </td>
 
                       {/* Active Sessions */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <span className="px-2 py-0.5 rounded-md bg-elevated border border-line text-ink-secondary text-[11px]">
-                          {u.activeSessionsCount}{' '}
-                          {lang === 'ar' ? 'جلسة' : 'sessions'}
+                          {u.activeSessionsCount} {lang === 'ar' ? 'جلسة' : 'sessions'}
                         </span>
                       </td>
 
                       {/* Created At */}
-                      <td className="py-3 px-4 text-ink-muted">
+                      <td className="py-3.5 px-4 text-ink-muted">
                         {new Date(u.createdAt).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center">
                         <button
                           type="button"
                           onClick={() => openUserDetail(u.id)}
-                          className="px-3 py-1.5 rounded-xl bg-gold-500/15 hover:bg-gold-500/25 text-gold-400 font-semibold text-xs transition border border-gold-500/30"
+                          className="px-3.5 py-1.5 rounded-xl bg-gold-500/15 hover:bg-gold-500/25 text-gold-400 font-semibold text-xs transition border border-gold-500/30 flex items-center gap-1.5 mx-auto"
                         >
-                          {lang === 'ar' ? 'إدارة الحساب' : 'Manage Account'}
+                          <IconEdit className="size-3.5" />
+                          <span>{lang === 'ar' ? 'إدارة الحساب' : 'Manage'}</span>
                         </button>
                       </td>
                     </tr>
@@ -774,10 +816,17 @@ export default function AdminUserManagement() {
       {/* Main Tab 2: All Recovery Requests */}
       {mainTab === 'recoveries' && (
         <div className="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-line flex flex-wrap items-center justify-between gap-3 bg-elevated/30">
-            <h2 className="text-sm font-bold text-ink-primary">
-              {lang === 'ar' ? 'سجل كافة طلبات استعادة الحسابات بالبريد البديل' : 'Account Alternative Recovery Log'}
-            </h2>
+          <div className="p-4 border-b border-line flex flex-wrap items-center justify-between gap-3 bg-elevated/20">
+            <div>
+              <h2 className="text-sm font-bold text-ink-primary">
+                {lang === 'ar' ? 'سجل كافة طلبات استعادة الحسابات بالبريد البديل' : 'Account Alternative Recovery Log'}
+              </h2>
+              <p className="text-[11px] text-ink-muted mt-0.5">
+                {lang === 'ar'
+                  ? 'مراجعة وتتبع واعتماد طلبات تغيير البريد للحسابات التي فقد أصحابها وصولهم للبريد الأصلي'
+                  : 'Track and review sensitive alternative email recovery requests requiring verification'}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <select
                 value={recoveryStatusFilter}
@@ -785,7 +834,7 @@ export default function AdminUserManagement() {
                   setRecoveryStatusFilter(e.target.value);
                   setRecoveryPage(1);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-surface border border-line text-xs text-ink-primary outline-none focus:border-gold-500"
+                className="h-9 px-3 rounded-xl bg-surface border border-line text-xs font-medium text-ink-primary outline-none focus:border-gold-500"
               >
                 <option value="">{lang === 'ar' ? 'كافة الحالات' : 'All Statuses'}</option>
                 <option value="PENDING_APPROVAL">{lang === 'ar' ? 'بانتظار الاعتماد المزدوج' : 'Pending Approval'}</option>
@@ -797,7 +846,8 @@ export default function AdminUserManagement() {
               <button
                 type="button"
                 onClick={loadRecoveries}
-                className="p-2 rounded-xl bg-surface border border-line text-ink-secondary hover:text-ink-primary transition"
+                className="h-9 p-2 rounded-xl bg-surface border border-line text-ink-secondary hover:text-ink-primary transition"
+                title={lang === 'ar' ? 'تحديث' : 'Refresh'}
               >
                 <IconRefresh className="size-4" />
               </button>
@@ -806,47 +856,47 @@ export default function AdminUserManagement() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-start text-xs">
-              <thead className="bg-elevated/60 text-ink-muted border-b border-line uppercase font-semibold">
+              <thead className="bg-elevated/50 text-ink-muted border-b border-line uppercase font-semibold">
                 <tr>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'رقم الطلب' : 'Recovery No'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'صاحب الحساب' : 'Account Owner'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'البريد البديل الجديد' : 'New Alternative Email'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'التحقق' : 'Verification'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'مستوى الخطورة' : 'Risk'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
-                  <th className="py-3 px-4 text-start">{lang === 'ar' ? 'المشرف المنشئ' : 'Initiator'}</th>
-                  <th className="py-3 px-4 text-center">{lang === 'ar' ? 'الإجراء' : 'Action'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'رقم الطلب' : 'Recovery No'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'صاحب الحساب' : 'Account Owner'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'البريد البديل الجديد' : 'New Alternative Email'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'طريقة التحقق' : 'Verification'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'مستوى الخطورة' : 'Risk'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+                  <th className="py-3.5 px-4 text-start">{lang === 'ar' ? 'المشرف المنشئ' : 'Initiator'}</th>
+                  <th className="py-3.5 px-4 text-center">{lang === 'ar' ? 'الإجراء' : 'Action'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
                 {loadingRecoveries ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-ink-secondary">
+                    <td colSpan={8} className="py-16 text-center text-ink-secondary">
                       <div className="inline-block size-6 border-2 border-gold-500 border-t-transparent rounded-full animate-spin mb-2" />
                       <div>{lang === 'ar' ? 'جاري تحميل طلبات الاستعادة...' : 'Loading recovery requests...'}</div>
                     </td>
                   </tr>
                 ) : (recoveries || []).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-ink-secondary">
+                    <td colSpan={8} className="py-16 text-center text-ink-secondary">
                       {lang === 'ar' ? 'لا توجد طلبات استعادة مطابقة' : 'No recovery requests found'}
                     </td>
                   </tr>
                 ) : (
                   (recoveries || []).map((r) => (
                     <tr key={r.id} className="hover:bg-elevated/40 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-gold-500">{r.recoveryNo}</td>
-                      <td className="py-3 px-4 font-medium text-ink-primary">
+                      <td className="py-3.5 px-4 font-mono font-bold text-gold-500">{r.recoveryNo}</td>
+                      <td className="py-3.5 px-4 font-medium text-ink-primary">
                         {r.user?.fullName || 'User'} (@{r.user?.username || '—'})
                       </td>
-                      <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                         {r.alternativeEmail}
                       </td>
-                      <td className="py-3 px-4 text-ink-secondary">
+                      <td className="py-3.5 px-4 text-ink-secondary">
                         <div>{r.verificationMethod}</div>
                         {r.evidenceRef && <div className="text-[10px] text-ink-muted">Ref: {r.evidenceRef}</div>}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         {r.isHighRisk ? (
                           <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold border border-rose-500/20">
                             {lang === 'ar' ? 'عالي الخطورة (اعتماد مزدوج)' : 'High Risk'}
@@ -857,7 +907,7 @@ export default function AdminUserManagement() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
                             r.status === 'COMPLETED'
@@ -870,24 +920,16 @@ export default function AdminUserManagement() {
                           }`}
                         >
                           {r.status === 'COMPLETED'
-                            ? lang === 'ar'
-                              ? 'مكتمل'
-                              : 'Completed'
+                            ? lang === 'ar' ? 'مكتمل' : 'Completed'
                             : r.status === 'PENDING_APPROVAL'
-                            ? lang === 'ar'
-                              ? 'بانتظار الاعتماد'
-                              : 'Pending Approval'
+                            ? lang === 'ar' ? 'بانتظار الاعتماد' : 'Pending Approval'
                             : r.status === 'VERIFICATION_SENT'
-                            ? lang === 'ar'
-                              ? 'أُرسل الرابط'
-                              : 'Link Sent'
-                            : lang === 'ar'
-                            ? 'مرفوض/ملغي'
-                            : r.status}
+                            ? lang === 'ar' ? 'أُرسل الرابط' : 'Link Sent'
+                            : lang === 'ar' ? 'مرفوض/ملغي' : r.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-ink-muted">{r.initiator?.fullName || 'Admin'}</td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3.5 px-4 text-ink-muted">{r.initiator?.fullName || 'Admin'}</td>
+                      <td className="py-3.5 px-4 text-center">
                         {r.status === 'PENDING_APPROVAL' ? (
                           <button
                             type="button"
@@ -919,680 +961,1064 @@ export default function AdminUserManagement() {
         </div>
       )}
 
-      {/* Comprehensive User Detail Drawer */}
+      {/* ============================================================ */}
+      {/* REDESIGNED ACCOUNT DETAILS WORKSPACE (LARGE CENTERED DIALOG) */}
+      {/* ============================================================ */}
       {activeUserId && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/70 backdrop-blur-sm flex justify-end">
-          <div className="w-full max-w-3xl bg-surface border-s border-line shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="p-5 border-b border-line flex items-center justify-between bg-elevated/40">
-              <div className="flex items-center gap-3">
-                <div className="size-11 rounded-xl bg-gold-500/20 text-gold-400 font-bold flex items-center justify-center text-base border border-gold-500/30">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 md:p-6 animate-in fade-in duration-200">
+          <div className="w-full sm:max-w-5xl md:max-w-6xl h-full sm:h-[90vh] sm:max-h-[92vh] bg-surface sm:border border-line sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Stable Header */}
+            <div className="px-5 py-4 border-b border-line bg-elevated/40 shrink-0 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="size-12 rounded-2xl bg-gold-500/10 border border-gold-500/20 text-gold-500 font-bold flex items-center justify-center text-lg shrink-0">
                   {userDetail?.fullName.slice(0, 1) || 'U'}
                 </div>
-                <div>
-                  <h2 className="text-base font-bold text-ink-primary flex items-center gap-2">
-                    <span>{userDetail?.fullName}</span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
-                        userDetail?.status === 'ACTIVE'
-                          ? 'bg-emerald-500/15 text-emerald-600'
-                          : 'bg-rose-500/15 text-rose-600 font-bold'
-                      }`}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base sm:text-lg font-bold text-ink-primary truncate">
+                      {userDetail?.fullName || (lang === 'ar' ? 'تحميل...' : 'Loading...')}
+                    </h2>
+                    <span className="text-xs text-ink-muted font-medium">@{userDetail?.username}</span>
+
+                    {/* Role Badge */}
+                    {userDetail && (
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                          userDetail.role === 'ADMIN'
+                            ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30'
+                            : userDetail.role === 'TEACHER'
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                            : 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30'
+                        }`}
+                      >
+                        {userDetail.role}
+                      </span>
+                    )}
+
+                    {/* Status Badge */}
+                    {userDetail && (
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                          userDetail.status === 'ACTIVE'
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {userDetail.status}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted mt-1 font-mono">
+                    <span className="truncate">{userDetail?.email}</span>
+                    <span className="opacity-40">•</span>
+                    <button
+                      type="button"
+                      onClick={() => userDetail && copyUserId(userDetail.id)}
+                      className="inline-flex items-center gap-1 hover:text-gold-500 transition cursor-pointer"
+                      title={lang === 'ar' ? 'انقر للنسخ' : 'Click to copy'}
                     >
-                      {userDetail?.status}
-                    </span>
-                  </h2>
-                  <div className="text-xs text-ink-muted font-mono flex items-center gap-2 mt-0.5">
-                    <span>@{userDetail?.username}</span>
-                    <span>•</span>
-                    <span>ID: {userDetail?.id}</span>
+                      <span>ID: {userDetail?.id?.slice(0, 10)}...</span>
+                      {copiedId ? (
+                        <IconCheck className="size-3 text-emerald-500" />
+                      ) : (
+                        <span className="text-[10px] underline opacity-70">{lang === 'ar' ? 'نسخ' : 'copy'}</span>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
 
+              {/* Close Button */}
               <button
                 type="button"
                 onClick={() => setActiveUserId(null)}
-                className="size-8 rounded-lg hover:bg-elevated flex items-center justify-center text-ink-muted hover:text-ink-primary transition"
+                className="size-9 rounded-xl border border-line bg-surface hover:bg-elevated flex items-center justify-center text-ink-secondary hover:text-ink-primary transition shrink-0"
+                title={lang === 'ar' ? 'إغلاق' : 'Close'}
               >
                 <IconClose className="size-5" />
               </button>
             </div>
 
-            {/* Risk Assessment Banner */}
+            {/* High-Risk Account Warning Banner (Subtle and Structured) */}
             {userDetail?.risk.isHighRisk && (
-              <div className="bg-rose-500/10 border-b border-rose-500/20 p-3 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
-                <IconAlert className="size-4 shrink-0 mt-0.5 text-rose-500" />
-                <div>
-                  <strong className="font-semibold">
-                    {lang === 'ar' ? 'تنبيه أمني — حساب عالي الخطورة:' : 'Security Alert — High Risk Account:'}
-                  </strong>
-                  <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[11px]">
-                    {userDetail.risk.reasons.map((r, i) => (
-                      <li key={i}>{r}</li>
-                    ))}
-                  </ul>
-                  <div className="text-[10px] opacity-80 mt-1">
-                    {lang === 'ar'
-                      ? 'أي استعادة بريد بديل لهذا الحساب تتطلب اعتمادًا إلزاميًا من مشرف ثانٍ (Dual-Admin Approval).'
-                      : 'Alternative email recovery requires mandatory dual approval.'}
-                  </div>
+              <div className="bg-rose-500/10 border-b border-rose-500/20 px-5 py-2.5 text-xs text-rose-700 dark:text-rose-300 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <IconAlert className="size-4 shrink-0 text-rose-500" />
+                  <span className="font-bold">
+                    {lang === 'ar' ? 'حساب عالي الخطورة:' : 'High Risk Account:'}
+                  </span>
+                  <span className="text-[11px] opacity-90 truncate max-w-xl">
+                    {userDetail.risk.reasons.join(' • ')}
+                  </span>
                 </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-600 dark:text-rose-300 shrink-0">
+                  {lang === 'ar' ? 'يتطلب اعتمادًا مزدوجًا' : 'Dual-Admin Required'}
+                </span>
               </div>
             )}
 
-            {/* Detail Tabs */}
-            <div className="flex border-b border-line bg-elevated/20 px-4 text-xs font-semibold overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setDetailTab('overview')}
-                className={`py-3 px-3 border-b-2 transition whitespace-nowrap ${
-                  detailTab === 'overview'
-                    ? 'border-gold-500 text-gold-500'
-                    : 'border-transparent text-ink-secondary hover:text-ink-primary'
-                }`}
-              >
-                {lang === 'ar' ? '1. البيانات وتعديل الملف' : 'Profile & Edit'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab('security')}
-                className={`py-3 px-3 border-b-2 transition whitespace-nowrap ${
-                  detailTab === 'security'
-                    ? 'border-gold-500 text-gold-500'
-                    : 'border-transparent text-ink-secondary hover:text-ink-primary'
-                }`}
-              >
-                {lang === 'ar' ? '2. الأمان والجلسات' : 'Security & Sessions'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab('password_recovery')}
-                className={`py-3 px-3 border-b-2 transition whitespace-nowrap ${
-                  detailTab === 'password_recovery'
-                    ? 'border-gold-500 text-gold-500'
-                    : 'border-transparent text-ink-secondary hover:text-ink-primary'
-                }`}
-              >
-                {lang === 'ar' ? '3. استعادة كلمة المرور (البريد الأصلي)' : 'Original Email Recovery'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab('alt_recovery')}
-                className={`py-3 px-3 border-b-2 transition whitespace-nowrap ${
-                  detailTab === 'alt_recovery'
-                    ? 'border-gold-500 text-gold-500'
-                    : 'border-transparent text-ink-secondary hover:text-ink-primary'
-                }`}
-              >
-                {lang === 'ar' ? '4. استعادة الحساب بالبريد البديل' : 'Alternative Email Recovery'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailTab('audit')}
-                className={`py-3 px-3 border-b-2 transition whitespace-nowrap ${
-                  detailTab === 'audit'
-                    ? 'border-gold-500 text-gold-500'
-                    : 'border-transparent text-ink-secondary hover:text-ink-primary'
-                }`}
-              >
-                {lang === 'ar' ? '5. سجل التدقيق' : 'Audit Trail'}
-              </button>
-            </div>
+            {/* Main Modal Layout: 2 Columns on Desktop, Segmented on Mobile */}
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+              
+              {/* Structured Navigation Sidebar */}
+              <div className="w-full md:w-64 border-b md:border-b-0 md:border-e border-line bg-elevated/20 p-2 sm:p-3 shrink-0 flex md:flex-col overflow-x-auto md:overflow-y-auto gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDetailSection('general')}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2.5 shrink-0 text-start w-full ${
+                    detailSection === 'general'
+                      ? 'bg-gold-500/15 text-gold-500 font-bold border border-gold-500/30'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-elevated/50'
+                  }`}
+                >
+                  <IconUser className="size-4 shrink-0" />
+                  <span>{lang === 'ar' ? 'المعلومات والملف' : 'General & Profile'}</span>
+                </button>
 
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {loadingDetail ? (
-                <div className="py-20 text-center text-ink-secondary">
-                  <div className="inline-block size-8 border-3 border-gold-500 border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-sm">{lang === 'ar' ? 'جاري تحميل تفاصيل الحساب...' : 'Loading details...'}</p>
-                </div>
-              ) : userDetail ? (
-                <>
-                  {/* TAB 1: OVERVIEW & EDIT */}
-                  {detailTab === 'overview' && (
-                    <div className="space-y-6">
-                      {/* Basic Info Summary */}
-                      <div className="grid grid-cols-2 gap-3 bg-elevated/30 border border-line rounded-xl p-4 text-xs">
-                        <div>
-                          <span className="text-ink-muted">{lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'}</span>
-                          <div className="font-mono font-bold text-ink-primary mt-0.5">{userDetail.email}</div>
-                          <div className="text-[10px] text-ink-muted mt-0.5">
-                            {userDetail.emailVerified
-                              ? lang === 'ar'
-                                ? 'تم التوثيق'
-                                : 'Verified'
-                              : lang === 'ar'
-                              ? 'غير موثق'
-                              : 'Unverified'}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-ink-muted">{lang === 'ar' ? 'رقم الواتساب:' : 'WhatsApp:'}</span>
-                          <div className="font-mono text-ink-primary mt-0.5">{userDetail.whatsapp || '—'}</div>
-                        </div>
-                        <div>
-                          <span className="text-ink-muted">{lang === 'ar' ? 'الدور الحالي:' : 'Current Role:'}</span>
-                          <div className="font-bold text-ink-primary mt-0.5">{userDetail.role}</div>
-                        </div>
-                        <div>
-                          <span className="text-ink-muted">{lang === 'ar' ? 'المستوى الدراسي:' : 'Level:'}</span>
-                          <div className="text-ink-primary mt-0.5">{userDetail.level || '—'}</div>
-                        </div>
-                      </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailSection('security')}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2.5 shrink-0 text-start w-full ${
+                    detailSection === 'security'
+                      ? 'bg-gold-500/15 text-gold-500 font-bold border border-gold-500/30'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-elevated/50'
+                  }`}
+                >
+                  <IconSecurity className="size-4 shrink-0" />
+                  <span>{lang === 'ar' ? 'الأمان والجلسات' : 'Security & Sessions'}</span>
+                </button>
 
-                      {/* Edit Profile Form */}
-                      <form onSubmit={handleSaveProfile} className="bg-surface border border-line rounded-xl p-4 space-y-4">
-                        <h3 className="text-xs font-bold text-ink-primary flex items-center gap-1.5">
-                          <IconEdit className="size-4 text-gold-500" />
-                          <span>{lang === 'ar' ? 'تعديل الملف الشخصي' : 'Edit Profile Information'}</span>
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <div>
-                            <label className="block text-ink-muted mb-1">{lang === 'ar' ? 'الاسم الكامل' : 'Full Name'}</label>
-                            <input
-                              type="text"
-                              value={editFullName}
-                              onChange={(e) => setEditFullName(e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-ink-muted mb-1">{lang === 'ar' ? 'رقم الواتساب' : 'WhatsApp'}</label>
-                            <input
-                              type="text"
-                              value={editWhatsapp}
-                              onChange={(e) => setEditWhatsapp(e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-xs">
-                          <label className="block text-ink-muted mb-1">{lang === 'ar' ? 'المستوى الدراسي' : 'Academic Level'}</label>
-                          <input
-                            type="text"
-                            value={editLevel}
-                            onChange={(e) => setEditLevel(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                          />
-                        </div>
-                        {userDetail.teacherProfile && (
-                          <div className="text-xs">
-                            <label className="block text-ink-muted mb-1">{lang === 'ar' ? 'نبذة المدرس' : 'Teacher Bio'}</label>
-                            <textarea
-                              rows={2}
-                              value={editBio}
-                              onChange={(e) => setEditBio(e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                            />
-                          </div>
-                        )}
-                        <button
-                          type="submit"
-                          disabled={savingProfile}
-                          className="px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 disabled:opacity-50 text-slate-950 font-bold text-xs transition"
-                        >
-                          {savingProfile ? 'جاري الحفظ...' : 'حفظ تعديلات الملف'}
-                        </button>
-                      </form>
+                <button
+                  type="button"
+                  onClick={() => setDetailSection('password_recovery')}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2.5 shrink-0 text-start w-full ${
+                    detailSection === 'password_recovery'
+                      ? 'bg-gold-500/15 text-gold-500 font-bold border border-gold-500/30'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-elevated/50'
+                  }`}
+                >
+                  <IconKey className="size-4 shrink-0" />
+                  <span>{lang === 'ar' ? 'استعادة كلمة المرور' : 'Password Recovery'}</span>
+                </button>
 
-                      {/* Change Username Box */}
-                      <form onSubmit={handleSaveUsername} className="bg-surface border border-line rounded-xl p-4 space-y-3">
-                        <h3 className="text-xs font-bold text-ink-primary flex items-center gap-1.5">
-                          <IconKey className="size-4 text-gold-500" />
-                          <span>{lang === 'ar' ? 'تغيير اسم المستخدم (مع التحقق من الفرادة)' : 'Change Username'}</span>
-                        </h3>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            className="flex-1 px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
-                            placeholder="username"
-                          />
-                          <button
-                            type="submit"
-                            disabled={savingUsername || newUsername === userDetail.username}
-                            className="px-4 py-2 rounded-lg bg-elevated border border-line hover:bg-elevated/80 disabled:opacity-40 text-ink-primary font-bold text-xs transition"
-                          >
-                            {savingUsername ? 'جاري الحفظ...' : 'تحديث اسم المستخدم'}
-                          </button>
-                        </div>
-                      </form>
+                <button
+                  type="button"
+                  onClick={() => setDetailSection('alt_recovery')}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2.5 shrink-0 text-start w-full ${
+                    detailSection === 'alt_recovery'
+                      ? 'bg-gold-500/15 text-gold-500 font-bold border border-gold-500/30'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-elevated/50'
+                  }`}
+                >
+                  <IconShieldKeyhole className="size-4 shrink-0" />
+                  <span>{lang === 'ar' ? 'استعادة بالبريد البديل' : 'Alternative Email'}</span>
+                </button>
 
-                      {/* Direct Email Change Box */}
-                      <form onSubmit={handleSaveDirectEmail} className="bg-surface border border-line rounded-xl p-4 space-y-3">
-                        <h3 className="text-xs font-bold text-ink-primary flex items-center gap-1.5">
-                          <IconAlert className="size-4 text-amber-500" />
-                          <span>{lang === 'ar' ? 'تغيير البريد الإلكتروني المباشر (مع سبب إداري)' : 'Direct Email Change'}</span>
-                        </h3>
-                        <p className="text-[11px] text-ink-muted leading-relaxed">
-                          {lang === 'ar'
-                            ? 'ملاحظة: هذا الإجراء يحدث البريد مباشرة ويقوم بإنهاء كافة الجلسات النشطة للمستخدم وتسجيل الحدث في سجل التدقيق.'
-                            : 'This updates email directly, terminates active sessions, and writes audit record.'}
-                        </p>
-                        <div className="space-y-2">
-                          <input
-                            type="email"
-                            value={newDirectEmail}
-                            onChange={(e) => setNewDirectEmail(e.target.value)}
-                            placeholder="new.email@example.com"
-                            className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
-                          />
-                          <input
-                            type="text"
-                            value={directEmailReason}
-                            onChange={(e) => setDirectEmailReason(e.target.value)}
-                            placeholder={lang === 'ar' ? 'السبب الإداري للتعديل المباشر (إلزامي)' : 'Administrative reason'}
-                            className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                          />
-                          <button
-                            type="submit"
-                            disabled={savingDirectEmail || !newDirectEmail || !directEmailReason}
-                            className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs transition"
-                          >
-                            {savingDirectEmail ? 'جاري التعديل...' : 'تحديث البريد مباشرة'}
-                          </button>
-                        </div>
-                      </form>
+                <button
+                  type="button"
+                  onClick={() => setDetailSection('audit')}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2.5 shrink-0 text-start w-full ${
+                    detailSection === 'audit'
+                      ? 'bg-gold-500/15 text-gold-500 font-bold border border-gold-500/30'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-elevated/50'
+                  }`}
+                >
+                  <IconAudit className="size-4 shrink-0" />
+                  <span>{lang === 'ar' ? 'سجل التدقيق والنشاط' : 'Audit History'}</span>
+                </button>
+              </div>
 
-                      {/* Role Management Protected Box */}
-                      <div className="bg-surface border border-line rounded-xl p-4 space-y-3">
-                        <h3 className="text-xs font-bold text-ink-primary flex items-center gap-1.5">
-                          <IconShieldKeyhole className="size-4 text-purple-500" />
-                          <span>{lang === 'ar' ? 'تعديل دور الحساب (إجراء محمي منفصل)' : 'Role Management'}</span>
-                        </h3>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                          <select
-                            value={newRole}
-                            onChange={(e) => setNewRole(e.target.value)}
-                            disabled={userDetail.id === currentAdmin?.id}
-                            className="px-3 py-2 rounded-lg bg-surface border border-line text-xs font-bold text-ink-primary"
-                          >
-                            <option value="STUDENT">طالب (STUDENT)</option>
-                            <option value="TEACHER">مدرس (TEACHER)</option>
-                            <option value="ADMIN">مدير نظام (ADMIN)</option>
-                          </select>
-
-                          <label className="flex items-center gap-2 text-xs text-ink-secondary cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={roleConfirmed}
-                              onChange={(e) => setRoleConfirmed(e.target.checked)}
-                              disabled={userDetail.id === currentAdmin?.id}
-                              className="rounded border-line"
-                            />
-                            <span>{lang === 'ar' ? 'أؤكد تغيير دور الحساب وإسقاط جلساته' : 'Confirm role change'}</span>
-                          </label>
-
-                          <button
-                            type="button"
-                            onClick={handleSaveRole}
-                            disabled={savingRole || !roleConfirmed || newRole === userDetail.role || userDetail.id === currentAdmin?.id}
-                            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold text-xs transition"
-                          >
-                            {savingRole ? 'جاري التطبيق...' : 'تطبيق تغيير الدور'}
-                          </button>
-                        </div>
-                        {userDetail.id === currentAdmin?.id && (
-                          <p className="text-[11px] text-rose-500 font-semibold">
-                            {lang === 'ar'
-                              ? 'حماية أمنية: لا يمكن للمشرف تعديل صلاحيات حسابه الإداري الخاص.'
-                              : 'Security protection: Administrators cannot modify their own role.'}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 2: SECURITY & SESSIONS */}
-                  {detailTab === 'security' && (
-                    <div className="space-y-6">
-                      {/* Account Action Buttons */}
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={handleRevokeSessions}
-                          className="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-xs transition flex items-center gap-2"
-                        >
-                          <IconProhibited className="size-4" />
-                          <span>{lang === 'ar' ? 'إلغاء كافة الجلسات النشطة للمستخدم' : 'Revoke All Active Sessions'}</span>
-                        </button>
-
-                        {userDetail.status === 'ACTIVE' ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowSuspendModal(true)}
-                            disabled={userDetail.id === currentAdmin?.id}
-                            className="px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs transition flex items-center gap-2 disabled:opacity-40"
-                          >
-                            <IconLock className="size-4" />
-                            <span>{lang === 'ar' ? 'تعليق الحساب مؤقتًا' : 'Suspend Account'}</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleReactivate}
-                            className="px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs transition flex items-center gap-2"
-                          >
-                            <IconCheck className="size-4" />
-                            <span>{lang === 'ar' ? 'إعادة تفعيل الحساب' : 'Reactivate Account'}</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Active Sessions List */}
-                      <div className="bg-surface border border-line rounded-xl overflow-hidden">
-                        <div className="p-3 bg-elevated/40 border-b border-line flex items-center justify-between">
-                          <h4 className="text-xs font-bold text-ink-primary">
-                            {lang === 'ar' ? 'الجلسات والأجهزة المسجلة' : 'Registered Devices & Sessions'}
-                          </h4>
-                          <span className="text-[11px] font-mono text-ink-muted">
-                            SessionVersion: {userDetail.sessionVersion}
-                          </span>
-                        </div>
-                        <div className="divide-y divide-line/60 text-xs">
-                          {userDetail.sessions.length === 0 ? (
-                            <div className="p-6 text-center text-ink-muted">
-                              {lang === 'ar' ? 'لا توجد جلسات مسجلة' : 'No recorded sessions'}
+              {/* Main Content Workspace */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6">
+                {loadingDetail ? (
+                  <div className="py-24 text-center text-ink-secondary">
+                    <div className="inline-block size-8 border-2 border-gold-500 border-t-transparent rounded-full animate-spin mb-3" />
+                    <p className="text-sm font-medium">{lang === 'ar' ? 'جاري تحميل تفاصيل الحساب...' : 'Loading account details...'}</p>
+                  </div>
+                ) : userDetail ? (
+                  <>
+                    {/* SECTION 1: GENERAL INFORMATION */}
+                    {detailSection === 'general' && (
+                      <div className="space-y-6">
+                        
+                        {/* 1.1 Personal Information Card */}
+                        <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-4">
+                          <div className="flex items-center justify-between border-b border-line pb-3">
+                            <div className="flex items-center gap-2">
+                              <IconUser className="size-4 text-gold-500" />
+                              <h3 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'البيانات الشخصية والملف' : 'Personal & Profile Information'}
+                              </h3>
                             </div>
-                          ) : (
-                            userDetail.sessions.map((s) => (
-                              <div key={s.id} className="p-3 flex items-center justify-between">
-                                <div>
-                                  <div className="font-mono text-ink-primary text-xs">
-                                    IP: {s.ip || '—'}
-                                  </div>
-                                  <div className="text-[11px] text-ink-muted truncate max-w-md">
-                                    {s.userAgent || 'Unknown Device'}
-                                  </div>
-                                </div>
-                                <div className="text-end">
-                                  {s.endedAt ? (
-                                    <span className="px-2 py-0.5 rounded text-[10px] bg-slate-500/10 text-ink-muted">
-                                      {lang === 'ar' ? 'مُنتهية' : 'Ended'} ({s.endReason || '—'})
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 font-bold">
-                                      {lang === 'ar' ? 'نشطة الآن' : 'Active'}
-                                    </span>
-                                  )}
-                                  <div className="text-[10px] text-ink-muted mt-0.5">
-                                    {new Date(s.lastSeenAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
-                                  </div>
-                                </div>
+                            <span className="text-[11px] text-ink-muted">
+                              {lang === 'ar' ? 'تاريخ الإنشاء: ' : 'Created: '}
+                              {new Date(userDetail.createdAt).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')}
+                            </span>
+                          </div>
+
+                          <form onSubmit={handleSaveProfile} className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                              <div>
+                                <label className="block text-ink-muted font-medium mb-1.5">
+                                  {lang === 'ar' ? 'الاسم الكامل' : 'Full Name'}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editFullName}
+                                  onChange={(e) => setEditFullName(e.target.value)}
+                                  className="w-full h-10 px-3.5 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 focus:ring-1 focus:ring-gold-500/20 outline-none transition"
+                                />
                               </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* TAB 3: PASSWORD RECOVERY (ORIGINAL EMAIL) */}
-                  {detailTab === 'password_recovery' && (
-                    <div className="bg-surface border border-line rounded-xl p-5 space-y-4">
-                      <div className="flex items-center gap-2">
-                        <IconKey className="size-5 text-gold-500" />
-                        <h3 className="text-sm font-bold text-ink-primary">
-                          {lang === 'ar' ? 'استعادة كلمة المرور عبر البريد المسجل الأصلي' : 'Original Email Password Recovery'}
-                        </h3>
-                      </div>
-
-                      <p className="text-xs text-ink-secondary leading-relaxed">
-                        {lang === 'ar'
-                          ? 'يقوم هذا الإجراء بتوليد رمز أمان عشوائي أحادي الاستخدام مشفر (SHA-256) وإرسال رابط استعادة صالح لمدة 30 دقيقة إلى البريد المسجل للحساب، مع إبطال كافة الرموز السابقة وتسجيل الحدث في سجل التدقيق.'
-                          : 'Generates single-use, cryptographically secure 30-min recovery link to the user’s currently registered email.'}
-                      </p>
-
-                      <div className="bg-elevated/40 border border-line rounded-xl p-4 text-xs space-y-1">
-                        <div className="text-ink-muted">{lang === 'ar' ? 'البريد الإلكتروني المستهدف:' : 'Target Email:'}</div>
-                        <div className="text-sm font-mono font-bold text-ink-primary">{userDetail.email}</div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleSendRecoveryEmail}
-                        className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold text-xs transition shadow-md flex items-center justify-center gap-2"
-                      >
-                        <IconKey className="size-4" />
-                        <span>{lang === 'ar' ? 'إرسال رابط الاستعادة إلى البريد الأصلي' : 'Send Recovery Link to Email'}</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* TAB 4: ALTERNATIVE EMAIL RECOVERY (LOST ORIGINAL EMAIL) */}
-                  {detailTab === 'alt_recovery' && (
-                    <div className="space-y-6">
-                      <form onSubmit={handleSubmitAltRecovery} className="bg-surface border border-line rounded-xl p-5 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <IconShieldKeyhole className="size-5 text-rose-500" />
-                          <h3 className="text-sm font-bold text-ink-primary">
-                            {lang === 'ar'
-                              ? 'استعادة الحساب عبر البريد البديل (عند فقدان البريد الأصلي نهائيًا)'
-                              : 'Alternative Email Recovery (Lost Original Email)'}
-                          </h3>
-                        </div>
-
-                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                          <strong>{lang === 'ar' ? 'تنبيه أمني هام:' : 'Critical Security Notice:'}</strong>{' '}
-                          {lang === 'ar'
-                            ? 'هذا الإجراء مخصص فقط للعملاء الذين فقدوا الوصول لبريدهم الأصلي بعد التحقق الرسمي من الهوية. الحسابات عالية الخطورة ستتطلب اعتمادًا إضافيًا من مشرف آخر قبل إرسال رابط التفعيل.'
-                            : 'This sensitive takeover workflow requires identity verification. High-risk accounts require dual-admin approval.'}
-                        </div>
-
-                        <div className="space-y-3 text-xs">
-                          <div>
-                            <label className="block text-ink-muted mb-1 font-semibold">
-                              {lang === 'ar' ? 'البريد الإلكتروني البديل الجديد *' : 'New Alternative Email *'}
-                            </label>
-                            <input
-                              type="email"
-                              required
-                              value={altEmail}
-                              onChange={(e) => setAltEmail(e.target.value)}
-                              placeholder="alt.email@domain.com"
-                              className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-ink-muted mb-1 font-semibold">
-                              {lang === 'ar' ? 'سبب فقدان الوصول للبريد الأصلي *' : 'Reason for Lost Email Access *'}
-                            </label>
-                            <textarea
-                              required
-                              rows={2}
-                              value={altReason}
-                              onChange={(e) => setAltReason(e.target.value)}
-                              placeholder={lang === 'ar' ? 'مثال: تعطل نطاق الجامعة السابق / اختراق الحساب القديم / ...' : 'Reason for loss'}
-                              className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-ink-muted mb-1 font-semibold">
-                                {lang === 'ar' ? 'طريقة التحقق من الهوية *' : 'Verification Method *'}
-                              </label>
-                              <select
-                                value={altVerificationMethod}
-                                onChange={(e) => setAltVerificationMethod(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                              >
-                                <option value="NATIONAL_ID">بطاقة الهوية الوطنية / الإقامة (National ID)</option>
-                                <option value="PASSPORT">جواز السفر (Passport)</option>
-                                <option value="STUDENT_ID">البطاقة الجامعية (Student ID)</option>
-                                <option value="ACADEMIC_RECORD">السجل الأكاديمي (Academic Record)</option>
-                                <option value="OFFICIAL_PHONE_CALL">مكالمة هاتفية موثقة (Phone Verification)</option>
-                                <option value="VIDEO_VERIFICATION">تحقق مرئي (Video Call)</option>
-                                <option value="OTHER">طريقة أخرى موثقة (Other)</option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="block text-ink-muted mb-1 font-semibold">
-                                {lang === 'ar' ? 'الرقم المرجعي للإثبات / التذكرة' : 'Evidence Ref / Ticket ID'}
-                              </label>
-                              <input
-                                type="text"
-                                value={altEvidenceRef}
-                                onChange={(e) => setAltEvidenceRef(e.target.value)}
-                                placeholder="TICK-10294"
-                                className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-ink-muted mb-1 font-semibold">
-                              {lang === 'ar' ? 'ملاحظات التحقق الإدارية' : 'Verification Notes'}
-                            </label>
-                            <input
-                              type="text"
-                              value={altNotes}
-                              onChange={(e) => setAltNotes(e.target.value)}
-                              placeholder={lang === 'ar' ? 'تمت مطابقة رقم الجوال المسجل والسجل الأكاديمي بنجاح' : 'Notes'}
-                              className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={submittingAltRecovery}
-                          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs transition shadow-md flex items-center justify-center gap-2"
-                        >
-                          <IconShieldKeyhole className="size-4" />
-                          <span>{submittingAltRecovery ? 'جاري المعالجة...' : 'بدء إجراء الاستعادة بالبريد البديل'}</span>
-                        </button>
-                      </form>
-
-                      {/* User's Recovery Requests History */}
-                      <div className="bg-surface border border-line rounded-xl overflow-hidden">
-                        <div className="p-3 bg-elevated/40 border-b border-line">
-                          <h4 className="text-xs font-bold text-ink-primary">
-                            {lang === 'ar' ? 'سجل طلبات استعادة هذا الحساب' : 'Recovery History for This Account'}
-                          </h4>
-                        </div>
-                        <div className="divide-y divide-line/60 text-xs">
-                          {userDetail.recoveries.length === 0 ? (
-                            <div className="p-6 text-center text-ink-muted">
-                              {lang === 'ar' ? 'لا توجد طلبات استعادة سابقة' : 'No previous recovery requests'}
-                            </div>
-                          ) : (
-                            userDetail.recoveries.map((rec) => (
-                              <div key={rec.id} className="p-3.5 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-mono font-bold text-gold-500">{rec.recoveryNo}</span>
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                      rec.status === 'COMPLETED'
-                                        ? 'bg-emerald-500/15 text-emerald-600'
-                                        : rec.status === 'PENDING_APPROVAL'
-                                        ? 'bg-amber-500/15 text-amber-600'
-                                        : 'bg-slate-500/10 text-ink-muted'
-                                    }`}
-                                  >
-                                    {rec.status}
+                              <div>
+                                <label className="block text-ink-muted font-medium mb-1.5">
+                                  {lang === 'ar' ? 'رقم الواتساب' : 'WhatsApp'}
+                                </label>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={editWhatsapp}
+                                    onChange={(e) => setEditWhatsapp(e.target.value)}
+                                    placeholder="+9665xxxxxxxx"
+                                    className="w-full h-10 ltr:pl-9 rtl:pr-9 ltr:pr-3 rtl:pl-3 rounded-xl bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 focus:ring-1 focus:ring-gold-500/20 outline-none transition"
+                                  />
+                                  <span className="absolute inset-y-0 ltr:left-3 rtl:right-3 flex items-center text-ink-muted pointer-events-none">
+                                    <IconWhatsapp className="size-4 text-emerald-500" />
                                   </span>
                                 </div>
-                                <div className="text-[11px] text-ink-secondary">
-                                  {lang === 'ar' ? 'البريد البديل: ' : 'Alternative Email: '}
-                                  <span className="font-mono font-bold text-ink-primary">{rec.alternativeEmail}</span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                              <div>
+                                <label className="block text-ink-muted font-medium mb-1.5">
+                                  {lang === 'ar' ? 'المستوى الدراسي' : 'Academic Level'}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editLevel}
+                                  onChange={(e) => setEditLevel(e.target.value)}
+                                  placeholder={lang === 'ar' ? 'مثال: السنة الثالثة' : 'e.g. Year 3'}
+                                  className="w-full h-10 px-3.5 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 focus:ring-1 focus:ring-gold-500/20 outline-none transition"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-ink-muted font-medium mb-1.5">
+                                  {lang === 'ar' ? 'الجامعة والتخصص' : 'University & Major'}
+                                </label>
+                                <div className="h-10 px-3.5 rounded-xl bg-elevated/40 border border-line text-ink-secondary text-xs flex items-center">
+                                  {userDetail.university?.name || (lang === 'ar' ? 'غير محدد' : 'Not set')}
+                                  {userDetail.major?.name ? ` — ${userDetail.major.name}` : ''}
                                 </div>
-                                <div className="text-[11px] text-ink-muted">
-                                  {lang === 'ar' ? 'السبب: ' : 'Reason: '}
-                                  {rec.reason}
+                              </div>
+                            </div>
+
+                            {userDetail.teacherProfile && (
+                              <div className="text-xs">
+                                <label className="block text-ink-muted font-medium mb-1.5">
+                                  {lang === 'ar' ? 'نبذة المدرس الأكاديمية' : 'Teacher Bio'}
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={editBio}
+                                  onChange={(e) => setEditBio(e.target.value)}
+                                  className="w-full p-3 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 focus:ring-1 focus:ring-gold-500/20 outline-none transition"
+                                />
+                              </div>
+                            )}
+
+                            <div className="flex justify-end pt-2">
+                              <button
+                                type="submit"
+                                disabled={savingProfile}
+                                className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 disabled:opacity-50 text-slate-950 font-bold text-xs transition shadow-sm"
+                              >
+                                {savingProfile ? (lang === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (lang === 'ar' ? 'حفظ تعديلات الملف' : 'Save Changes')}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+
+                        {/* 1.2 Username Management Card */}
+                        <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-4">
+                          <div className="flex items-center gap-2 border-b border-line pb-3">
+                            <IconKey className="size-4 text-gold-500" />
+                            <h3 className="text-sm font-bold text-ink-primary">
+                              {lang === 'ar' ? 'اسم المستخدم (مع التحقق من الفرادة)' : 'Username Settings'}
+                            </h3>
+                          </div>
+
+                          <form onSubmit={handleSaveUsername} className="space-y-3">
+                            <p className="text-xs text-ink-muted">
+                              {lang === 'ar'
+                                ? 'يجب أن يتكون اسم المستخدم من 3 إلى 30 حرفًا أو رقمًا باللغة الإنجليزية ولا يحتوي مسافات.'
+                                : 'Username must be 3-30 alphanumeric characters without spaces.'}
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              <div className="relative flex-1">
+                                <input
+                                  type="text"
+                                  value={newUsername}
+                                  onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                                  className="w-full h-10 ltr:pl-8 rtl:pr-8 ltr:pr-3 rtl:pl-3 rounded-xl bg-surface border border-line text-xs font-mono font-bold text-ink-primary focus:border-gold-500 focus:ring-1 focus:ring-gold-500/20 outline-none transition"
+                                  placeholder="username"
+                                />
+                                <span className="absolute inset-y-0 ltr:left-3 rtl:right-3 flex items-center text-ink-muted font-mono">
+                                  @
+                                </span>
+                              </div>
+                              <button
+                                type="submit"
+                                disabled={savingUsername || newUsername === userDetail.username || !newUsername.trim()}
+                                className="h-10 px-5 rounded-xl bg-elevated border border-line hover:bg-elevated/80 disabled:opacity-40 text-ink-primary font-bold text-xs transition shrink-0"
+                              >
+                                {savingUsername ? (lang === 'ar' ? 'جاري التحديث...' : 'Updating...') : (lang === 'ar' ? 'تحديث اسم المستخدم' : 'Update Username')}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+
+                        {/* 1.3 Contact & Direct Email Update Card */}
+                        <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-4">
+                          <div className="flex items-center justify-between border-b border-line pb-3">
+                            <div className="flex items-center gap-2">
+                              <IconAlert className="size-4 text-amber-500" />
+                              <h3 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'البريد الإلكتروني المسجل والتوثيق' : 'Registered Email & Verification'}
+                              </h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {userDetail.emailVerified ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  <IconCheck className="size-3.5" />
+                                  <span>{lang === 'ar' ? 'موثق' : 'Verified'}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                  <IconAlert className="size-3.5" />
+                                  <span>{lang === 'ar' ? 'غير موثق' : 'Unverified'}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-elevated/30 border border-line rounded-xl p-4">
+                            <div>
+                              <div className="text-[11px] text-ink-muted">{lang === 'ar' ? 'البريد الإلكتروني الحالي للحساب:' : 'Current Email:'}</div>
+                              <div className="font-mono font-bold text-ink-primary text-sm mt-0.5">{userDetail.email}</div>
+                              {userDetail.emailVerifiedAt && (
+                                <div className="text-[10px] text-ink-muted mt-1">
+                                  {lang === 'ar' ? 'وقت التوثيق: ' : 'Verified at: '}
+                                  {new Date(userDetail.emailVerifiedAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
                                 </div>
-                                <div className="text-[10px] text-ink-muted flex items-center gap-3">
-                                  <span>{lang === 'ar' ? 'المنشئ: ' : 'Initiator: '}{rec.initiator.fullName}</span>
-                                  {rec.reviewer && (
-                                    <span>• {lang === 'ar' ? 'المعتمد: ' : 'Reviewer: '}{rec.reviewer.fullName}</span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowDirectEmailForm(!showDirectEmailForm)}
+                              className="px-4 py-2 rounded-xl bg-surface border border-line text-xs font-bold text-ink-secondary hover:text-ink-primary hover:bg-elevated transition self-start sm:self-auto"
+                            >
+                              {showDirectEmailForm
+                                ? (lang === 'ar' ? 'إلغاء التعديل' : 'Cancel')
+                                : (lang === 'ar' ? 'تعديل البريد مباشرة (إداري)' : 'Change Email Directly')}
+                            </button>
+                          </div>
+
+                          {showDirectEmailForm && (
+                            <form onSubmit={handleSaveDirectEmail} className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 space-y-3 animate-in fade-in duration-150">
+                              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                                {lang === 'ar'
+                                  ? 'تنبيه: التعديل المباشر يحدث البريد فوراً بدون انتظار تحقق، ويسقط كافة الجلسات النشطة للمستخدم ويسجل الحدث في سجل التدقيق الأمني.'
+                                  : 'Notice: Direct change updates email immediately, revokes all sessions, and logs an audit trail.'}
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                <div>
+                                  <label className="block text-ink-muted mb-1 font-semibold">
+                                    {lang === 'ar' ? 'البريد الإلكتروني الجديد *' : 'New Email *'}
+                                  </label>
+                                  <input
+                                    type="email"
+                                    required
+                                    value={newDirectEmail}
+                                    onChange={(e) => setNewDirectEmail(e.target.value)}
+                                    placeholder="new.email@example.com"
+                                    className="w-full h-10 px-3 rounded-xl bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-ink-muted mb-1 font-semibold">
+                                    {lang === 'ar' ? 'السبب الإداري للتعديل *' : 'Administrative Reason *'}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={directEmailReason}
+                                    onChange={(e) => setDirectEmailReason(e.target.value)}
+                                    placeholder={lang === 'ar' ? 'سبب التعديل المباشر...' : 'Reason...'}
+                                    className="w-full h-10 px-3 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex justify-end pt-1">
+                                <button
+                                  type="submit"
+                                  disabled={savingDirectEmail || !newDirectEmail || !directEmailReason}
+                                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs transition"
+                                >
+                                  {savingDirectEmail ? (lang === 'ar' ? 'جاري التعديل...' : 'Updating...') : (lang === 'ar' ? 'تأكيد تعديل البريد' : 'Confirm Change')}
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+
+                        {/* 1.4 Role Management (Protected Action) */}
+                        <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-4">
+                          <div className="flex items-center gap-2 border-b border-line pb-3">
+                            <IconShieldKeyhole className="size-4 text-purple-500" />
+                            <h3 className="text-sm font-bold text-ink-primary">
+                              {lang === 'ar' ? 'تعديل دور الحساب (إجراء محمي)' : 'Role Management (Protected Operation)'}
+                            </h3>
+                          </div>
+
+                          <div className="space-y-3">
+                            <p className="text-xs text-ink-muted">
+                              {lang === 'ar'
+                                ? 'تغيير الدور بين (طالب / مدرس / مدير) يتطلب تأكيداً صريحاً ويقوم بإنهاء كافة الجلسات النشطة للمستخدم فوراً لتطبيق الصلاحيات الجديدة.'
+                                : 'Role changes require explicit confirmation and invalidate all active sessions immediately.'}
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                              <select
+                                value={newRole}
+                                onChange={(e) => setNewRole(e.target.value)}
+                                disabled={userDetail.id === currentAdmin?.id}
+                                className="h-10 px-3.5 rounded-xl bg-surface border border-line text-xs font-bold text-ink-primary outline-none focus:border-purple-500"
+                              >
+                                <option value="STUDENT">{lang === 'ar' ? 'طالب (STUDENT)' : 'Student (STUDENT)'}</option>
+                                <option value="TEACHER">{lang === 'ar' ? 'مدرس (TEACHER)' : 'Teacher (TEACHER)'}</option>
+                                <option value="ADMIN">{lang === 'ar' ? 'مدير نظام (ADMIN)' : 'Administrator (ADMIN)'}</option>
+                              </select>
+
+                              <label className="flex items-center gap-2 text-xs text-ink-secondary cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={roleConfirmed}
+                                  onChange={(e) => setRoleConfirmed(e.target.checked)}
+                                  disabled={userDetail.id === currentAdmin?.id}
+                                  className="rounded border-line"
+                                />
+                                <span>{lang === 'ar' ? 'أؤكد رغبتي بتغيير دور المستخدم وإسقاط الجلسات' : 'Confirm role modification'}</span>
+                              </label>
+
+                              <button
+                                type="button"
+                                onClick={handleSaveRole}
+                                disabled={savingRole || !roleConfirmed || newRole === userDetail.role || userDetail.id === currentAdmin?.id}
+                                className="h-10 px-5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold text-xs transition shrink-0"
+                              >
+                                {savingRole ? (lang === 'ar' ? 'جاري التطبيق...' : 'Applying...') : (lang === 'ar' ? 'تطبيق تغيير الدور' : 'Apply Role Change')}
+                              </button>
+                            </div>
+
+                            {userDetail.id === currentAdmin?.id && (
+                              <p className="text-xs text-rose-500 font-semibold">
+                                {lang === 'ar'
+                                  ? 'حماية أمنية: لا يمكن للمشرف تعديل صلاحيات أو دور حسابه الإداري الخاص.'
+                                  : 'Security Protection: Administrators cannot modify their own role.'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+
+                    {/* SECTION 2: SECURITY & SESSIONS */}
+                    {detailSection === 'security' && (
+                      <div className="space-y-6">
+                        
+                        {/* 2.1 Security Actions Toolbar */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          
+                          {/* Revoke Sessions Card */}
+                          <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2">
+                              <IconProhibited className="size-5 text-amber-500" />
+                              <h4 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'إلغاء كافة الجلسات النشطة' : 'Revoke All Sessions'}
+                              </h4>
+                            </div>
+                            <p className="text-xs text-ink-muted leading-relaxed">
+                              {lang === 'ar'
+                                ? 'يقوم هذا الإجراء برفع إصدار الجلسة وإسقاط كافة الرموز الحالية، وتسجيل الخروج الفوري من جميع الأجهزة والمتصفحات.'
+                                : 'Increments sessionVersion, immediately terminating all active logins across devices.'}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleRevokeSessions}
+                              className="px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-xs transition flex items-center gap-2"
+                            >
+                              <IconProhibited className="size-4" />
+                              <span>{lang === 'ar' ? 'إسقاط كافة الجلسات الآن' : 'Revoke All Sessions'}</span>
+                            </button>
+                          </div>
+
+                          {/* Suspend / Reactivate Card */}
+                          <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-3">
+                            <div className="flex items-center gap-2">
+                              <IconLock className="size-5 text-rose-500" />
+                              <h4 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'حالة الحساب والحظر' : 'Account Status & Lock'}
+                              </h4>
+                            </div>
+                            <p className="text-xs text-ink-muted leading-relaxed">
+                              {userDetail.status === 'ACTIVE'
+                                ? lang === 'ar'
+                                  ? 'الحساب نشط حالياً. يمكنك تعليق الحساب مؤقتاً لأسباب أمنية أو مخالفة الشروط.'
+                                  : 'Account is active. Suspending blocks logins and revokes sessions.'
+                                : lang === 'ar'
+                                  ? 'الحساب معلق حالياً. يمكنك استعادة تفعيله والسماح للمستخدم بالدخول مجدداً.'
+                                  : 'Account is currently suspended. You can reactivate access.'}
+                            </p>
+                            <div>
+                              {userDetail.status === 'ACTIVE' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowSuspendModal(true)}
+                                  disabled={userDetail.id === currentAdmin?.id}
+                                  className="px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs transition flex items-center gap-2 disabled:opacity-40"
+                                >
+                                  <IconLock className="size-4" />
+                                  <span>{lang === 'ar' ? 'تعليق الحساب مؤقتاً' : 'Suspend Account'}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleReactivate}
+                                  className="px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs transition flex items-center gap-2"
+                                >
+                                  <IconCheck className="size-4" />
+                                  <span>{lang === 'ar' ? 'إعادة تفعيل الحساب' : 'Reactivate Account'}</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* 2.2 Active Sessions List */}
+                        <div className="bg-surface border border-line rounded-2xl overflow-hidden shadow-sm">
+                          <div className="p-4 bg-elevated/40 border-b border-line flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-ink-primary flex items-center gap-2">
+                              <IconSecurity className="size-4 text-gold-500" />
+                              <span>{lang === 'ar' ? 'سجل الأجهزة والجلسات المسجلة' : 'Registered Devices & Sessions'}</span>
+                            </h4>
+                            <span className="text-[11px] font-mono text-ink-muted">
+                              SessionVersion: {userDetail.sessionVersion}
+                            </span>
+                          </div>
+
+                          <div className="divide-y divide-line/60 text-xs">
+                            {userDetail.sessions.length === 0 ? (
+                              <div className="p-8 text-center text-ink-muted">
+                                {lang === 'ar' ? 'لا توجد جلسات مسجلة لهذا الحساب' : 'No recorded sessions'}
+                              </div>
+                            ) : (
+                              userDetail.sessions.map((s) => (
+                                <div key={s.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-elevated/30 transition">
+                                  <div>
+                                    <div className="font-mono text-ink-primary font-bold text-xs flex items-center gap-2">
+                                      <span>IP: {s.ip || '—'}</span>
+                                    </div>
+                                    <div className="text-[11px] text-ink-muted truncate max-w-lg mt-0.5">
+                                      {s.userAgent || 'Unknown Device / Browser'}
+                                    </div>
+                                  </div>
+                                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1">
+                                    {s.endedAt ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-500/10 text-ink-muted font-medium">
+                                        {lang === 'ar' ? 'مُنتهية' : 'Ended'} ({s.endReason || '—'})
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+                                        {lang === 'ar' ? 'جلسة نشطة' : 'Active'}
+                                      </span>
+                                    )}
+                                    <div className="text-[10px] text-ink-muted">
+                                      {new Date(s.lastSeenAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+
+                    {/* SECTION 3: PASSWORD RECOVERY (ORIGINAL EMAIL) */}
+                    {detailSection === 'password_recovery' && (
+                      <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm space-y-5">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-500 flex items-center justify-center">
+                            <IconKey className="size-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-bold text-ink-primary">
+                              {lang === 'ar' ? 'استعادة كلمة المرور عبر البريد المسجل الأصلي' : 'Original Email Password Recovery'}
+                            </h3>
+                            <p className="text-xs text-ink-muted mt-0.5">
+                              {lang === 'ar'
+                                ? 'إجراء رسمي لإرسال رابط إعادة تعيين كلمة المرور إلى البريد المسجل للحساب'
+                                : 'Send a single-use secure reset link to the account’s registered email'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="bg-elevated/30 border border-line rounded-xl p-4 text-xs space-y-2">
+                          <div className="text-ink-muted">{lang === 'ar' ? 'البريد الإلكتروني المستهدف للرسالة:' : 'Target Registered Email:'}</div>
+                          <div className="text-base font-mono font-bold text-ink-primary">{userDetail.email}</div>
+                          <div className="text-[11px] text-ink-secondary leading-relaxed pt-1">
+                            {lang === 'ar'
+                              ? '• يتم توليد رمز أمان عشوائي أحادي الاستخدام (Single-Use Token) مشفر بتجزئة SHA-256.'
+                              : '• Cryptographically secure single-use token hashed with SHA-256.'}
+                            <br />
+                            {lang === 'ar'
+                              ? '• صلاحية الرابط 30 دقيقة فقط، ويتم إبطال كافة الرموز السابقة فور الإرسال.'
+                              : '• Link expires in 30 minutes; previous tokens are invalidated.'}
+                            <br />
+                            {lang === 'ar'
+                              ? '• لن يتم إرسال أي كلمة مرور بنص واضح، ولن يطلع المشرف على الرمز أو كلمة المرور الجديدة.'
+                              : '• No plaintext passwords are sent or exposed to administrators.'}
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowPasswordRecoveryConfirm(true)}
+                            className="px-6 py-3 rounded-xl bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold text-xs transition shadow-md flex items-center gap-2"
+                          >
+                            <IconKey className="size-4" />
+                            <span>{lang === 'ar' ? 'إرسال رابط الاستعادة إلى البريد الأصلي' : 'Send Recovery Link to Email'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SECTION 4: ALTERNATIVE EMAIL RECOVERY (WIZARD) */}
+                    {detailSection === 'alt_recovery' && (
+                      <div className="space-y-6">
+                        
+                        {/* Security Warning Box */}
+                        <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
+                          <IconAlert className="size-5 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="leading-relaxed">
+                            <strong className="font-bold">
+                              {lang === 'ar' ? 'مسار استعادة الحساب الحساس (فقدان البريد الأصلي):' : 'Sensitive Account Takeover Workflow:'}
+                            </strong>
+                            <p className="mt-1 text-[11px]">
+                              {lang === 'ar'
+                                ? 'هذا الإجراء مخصص حصراً للحالات التي فقد فيها المستخدم إمكانية الوصول لبريده القديم بشكل نهائي. يتطلب توثيقاً رسمياً للهوية، وتخضع الحسابات عالية الخطورة لاعتماد إلزامي من مشرف ثانٍ (Dual-Admin Approval) قبل إرسال رابط التفعيل.'
+                                : 'For users who permanently lost their original email. Strict identity verification required. High-risk accounts require secondary admin approval.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Step-Based Wizard Form */}
+                        <div className="bg-surface border border-line rounded-2xl p-6 shadow-sm space-y-6">
+                          
+                          {/* Stepper Navigation */}
+                          <div className="grid grid-cols-4 gap-2 border-b border-line pb-4 text-xs">
+                            <div className={`p-2 rounded-xl text-center font-bold transition ${altStep === 1 ? 'bg-gold-500/15 text-gold-500 border border-gold-500/30' : 'text-ink-muted'}`}>
+                              1. {lang === 'ar' ? 'تأكيد الحساب' : 'Account'}
+                            </div>
+                            <div className={`p-2 rounded-xl text-center font-bold transition ${altStep === 2 ? 'bg-gold-500/15 text-gold-500 border border-gold-500/30' : 'text-ink-muted'}`}>
+                              2. {lang === 'ar' ? 'البريد البديل' : 'New Email'}
+                            </div>
+                            <div className={`p-2 rounded-xl text-center font-bold transition ${altStep === 3 ? 'bg-gold-500/15 text-gold-500 border border-gold-500/30' : 'text-ink-muted'}`}>
+                              3. {lang === 'ar' ? 'التحقق والسبب' : 'Verification'}
+                            </div>
+                            <div className={`p-2 rounded-xl text-center font-bold transition ${altStep === 4 ? 'bg-gold-500/15 text-gold-500 border border-gold-500/30' : 'text-ink-muted'}`}>
+                              4. {lang === 'ar' ? 'المراجعة والإرسال' : 'Submit'}
+                            </div>
+                          </div>
+
+                          {/* Wizard Step 1: Confirmation */}
+                          {altStep === 1 && (
+                            <div className="space-y-4 text-xs animate-in fade-in duration-150">
+                              <h4 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'الخطوة 1: التحقق من الحساب المستهدف' : 'Step 1: Confirm Target Account'}
+                              </h4>
+                              <div className="bg-elevated/40 border border-line rounded-xl p-4 space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'اسم المستخدم:' : 'Username:'}</span>
+                                  <span className="font-bold text-ink-primary">@{userDetail.username}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'البريد القديم المسجل:' : 'Old Email:'}</span>
+                                  <span className="font-mono text-ink-secondary">{userDetail.email}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'تصنيف الخطورة:' : 'Risk Level:'}</span>
+                                  <span className={userDetail.risk.isHighRisk ? 'text-rose-500 font-bold' : 'text-emerald-500 font-bold'}>
+                                    {userDetail.risk.isHighRisk ? (lang === 'ar' ? 'عالي الخطورة (يتطلب اعتماد مزدوج)' : 'High Risk') : (lang === 'ar' ? 'عادي' : 'Normal')}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex justify-end pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAltStep(2)}
+                                  className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-slate-950 font-bold text-xs transition flex items-center gap-2"
+                                >
+                                  <span>{lang === 'ar' ? 'المتابعة للبريد البديل' : 'Continue'}</span>
+                                  <IconArrowForward className="size-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Wizard Step 2: New Alternative Email */}
+                          {altStep === 2 && (
+                            <div className="space-y-4 text-xs animate-in fade-in duration-150">
+                              <h4 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'الخطوة 2: إدخال البريد الإلكتروني البديل الجديد' : 'Step 2: Enter New Alternative Email'}
+                              </h4>
+                              <div>
+                                <label className="block text-ink-muted font-semibold mb-1.5">
+                                  {lang === 'ar' ? 'البريد الإلكتروني البديل الجديد *' : 'New Alternative Email *'}
+                                </label>
+                                <input
+                                  type="email"
+                                  required
+                                  value={altEmail}
+                                  onChange={(e) => setAltEmail(e.target.value)}
+                                  placeholder="new.alternative@example.com"
+                                  className="w-full h-10 px-3.5 rounded-xl bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
+                                />
+                                <p className="text-[11px] text-ink-muted mt-1.5">
+                                  {lang === 'ar'
+                                    ? 'سيتم إرسال رابط تأكيد وتعيين كلمة المرور إلى هذا العنوان فقط بعد اعتماد الطلب.'
+                                    : 'A secure verification link will be sent to this address once approved.'}
+                                </p>
+                              </div>
+
+                              <div className="flex justify-between pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAltStep(1)}
+                                  className="px-4 py-2 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
+                                >
+                                  {lang === 'ar' ? 'رجوع' : 'Back'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!altEmail || !altEmail.includes('@')}
+                                  onClick={() => setAltStep(3)}
+                                  className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 disabled:opacity-40 text-slate-950 font-bold text-xs transition flex items-center gap-2"
+                                >
+                                  <span>{lang === 'ar' ? 'المتابعة لبيانات التحقق' : 'Continue'}</span>
+                                  <IconArrowForward className="size-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Wizard Step 3: Identity Verification & Reason */}
+                          {altStep === 3 && (
+                            <div className="space-y-4 text-xs animate-in fade-in duration-150">
+                              <h4 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'الخطوة 3: توثيق الهوية وسبب الفقدان' : 'Step 3: Verification Method & Reason'}
+                              </h4>
+
+                              <div>
+                                <label className="block text-ink-muted font-semibold mb-1">
+                                  {lang === 'ar' ? 'سبب فقدان الوصول للبريد الأصلي *' : 'Reason for Lost Email Access *'}
+                                </label>
+                                <textarea
+                                  required
+                                  rows={2}
+                                  value={altReason}
+                                  onChange={(e) => setAltReason(e.target.value)}
+                                  placeholder={lang === 'ar' ? 'مثال: تعطل نطاق الجامعة السابق / اختراق الحساب القديم...' : 'Reason for loss'}
+                                  className="w-full p-3 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-ink-muted font-semibold mb-1">
+                                    {lang === 'ar' ? 'طريقة التحقق من الهوية *' : 'Verification Method *'}
+                                  </label>
+                                  <select
+                                    value={altVerificationMethod}
+                                    onChange={(e) => setAltVerificationMethod(e.target.value)}
+                                    className="w-full h-10 px-3 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
+                                  >
+                                    <option value="NATIONAL_ID">بطاقة الهوية الوطنية / الإقامة (National ID)</option>
+                                    <option value="PASSPORT">جواز السفر (Passport)</option>
+                                    <option value="STUDENT_ID">البطاقة الجامعية (Student ID)</option>
+                                    <option value="ACADEMIC_RECORD">السجل الأكاديمي (Academic Record)</option>
+                                    <option value="OFFICIAL_PHONE_CALL">مكالمة هاتفية موثقة (Phone Verification)</option>
+                                    <option value="VIDEO_VERIFICATION">تحقق مرئي (Video Call)</option>
+                                    <option value="OTHER">طريقة أخرى موثقة (Other)</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-ink-muted font-semibold mb-1">
+                                    {lang === 'ar' ? 'الرقم المرجعي للإثبات / التذكرة' : 'Evidence Ref / Ticket ID'}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={altEvidenceRef}
+                                    onChange={(e) => setAltEvidenceRef(e.target.value)}
+                                    placeholder="TICK-10294"
+                                    className="w-full h-10 px-3 rounded-xl bg-surface border border-line text-ink-primary text-xs font-mono focus:border-gold-500 outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-ink-muted font-semibold mb-1">
+                                  {lang === 'ar' ? 'ملاحظات التحقق الإدارية' : 'Verification Notes'}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={altNotes}
+                                  onChange={(e) => setAltNotes(e.target.value)}
+                                  placeholder={lang === 'ar' ? 'تمت مطابقة رقم الجوال المسجل والسجل الأكاديمي بنجاح' : 'Notes'}
+                                  className="w-full h-10 px-3 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
+                                />
+                              </div>
+
+                              <div className="flex justify-between pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAltStep(2)}
+                                  className="px-4 py-2 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
+                                >
+                                  {lang === 'ar' ? 'رجوع' : 'Back'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!altReason.trim()}
+                                  onClick={() => setAltStep(4)}
+                                  className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 disabled:opacity-40 text-slate-950 font-bold text-xs transition flex items-center gap-2"
+                                >
+                                  <span>{lang === 'ar' ? 'المتابعة للمراجعة النهائية' : 'Review & Submit'}</span>
+                                  <IconArrowForward className="size-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Wizard Step 4: Review & Final Submission */}
+                          {altStep === 4 && (
+                            <form onSubmit={handleSubmitAltRecovery} className="space-y-4 text-xs animate-in fade-in duration-150">
+                              <h4 className="text-sm font-bold text-ink-primary">
+                                {lang === 'ar' ? 'الخطوة 4: تأكيد ومراجعة طلب الاستعادة' : 'Step 4: Confirm and Submit Recovery Request'}
+                              </h4>
+
+                              <div className="bg-elevated/40 border border-line rounded-xl p-4 space-y-2.5">
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'صاحب الحساب:' : 'Account Owner:'}</span>
+                                  <span className="font-bold text-ink-primary">{userDetail.fullName} (@{userDetail.username})</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'البريد البديل الجديد:' : 'New Alternative Email:'}</span>
+                                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{altEmail}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'سبب الفقدان:' : 'Reason:'}</span>
+                                  <span className="text-ink-primary">{altReason}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ink-muted">{lang === 'ar' ? 'طريقة التحقق:' : 'Method:'}</span>
+                                  <span className="text-ink-primary">{altVerificationMethod}</span>
+                                </div>
+                                {altEvidenceRef && (
+                                  <div className="flex justify-between">
+                                    <span className="text-ink-muted">{lang === 'ar' ? 'مرجع الإثبات:' : 'Evidence Ref:'}</span>
+                                    <span className="font-mono text-ink-primary">{altEvidenceRef}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex justify-between pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAltStep(3)}
+                                  className="px-4 py-2 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
+                                >
+                                  {lang === 'ar' ? 'رجوع للتعديل' : 'Back'}
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={submittingAltRecovery}
+                                  className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs transition shadow-md flex items-center gap-2"
+                                >
+                                  <IconShieldKeyhole className="size-4" />
+                                  <span>{submittingAltRecovery ? (lang === 'ar' ? 'جاري المعالجة...' : 'Processing...') : (lang === 'ar' ? 'تأكيد وإرسال طلب الاستعادة' : 'Submit Recovery Request')}</span>
+                                </button>
+                              </div>
+                            </form>
+                          )}
+
+                        </div>
+
+                        {/* User's Previous Recovery Requests Table */}
+                        <div className="bg-surface border border-line rounded-2xl overflow-hidden shadow-sm">
+                          <div className="p-4 bg-elevated/40 border-b border-line">
+                            <h4 className="text-xs font-bold text-ink-primary">
+                              {lang === 'ar' ? 'سجل طلبات استعادة هذا الحساب' : 'Recovery History for This Account'}
+                            </h4>
+                          </div>
+                          <div className="divide-y divide-line/60 text-xs">
+                            {userDetail.recoveries.length === 0 ? (
+                              <div className="p-8 text-center text-ink-muted">
+                                {lang === 'ar' ? 'لا توجد طلبات استعادة سابقة لهذا الحساب' : 'No previous recovery requests'}
+                              </div>
+                            ) : (
+                              userDetail.recoveries.map((rec) => (
+                                <div key={rec.id} className="p-4 space-y-2 hover:bg-elevated/30 transition">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-mono font-bold text-gold-500">{rec.recoveryNo}</span>
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        rec.status === 'COMPLETED'
+                                          ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/20'
+                                          : rec.status === 'PENDING_APPROVAL'
+                                          ? 'bg-amber-500/15 text-amber-600 border border-amber-500/20'
+                                          : 'bg-slate-500/10 text-ink-muted'
+                                      }`}
+                                    >
+                                      {rec.status}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-ink-secondary">
+                                    {lang === 'ar' ? 'البريد البديل: ' : 'Alternative Email: '}
+                                    <span className="font-mono font-bold text-ink-primary">{rec.alternativeEmail}</span>
+                                  </div>
+                                  <div className="text-[11px] text-ink-muted">
+                                    {lang === 'ar' ? 'السبب: ' : 'Reason: '}{rec.reason}
+                                  </div>
+                                  <div className="text-[10px] text-ink-muted flex items-center gap-3 pt-1">
+                                    <span>{lang === 'ar' ? 'المنشئ: ' : 'Initiator: '}{rec.initiator.fullName}</span>
+                                    {rec.reviewer && (
+                                      <span>• {lang === 'ar' ? 'المعتمد: ' : 'Reviewer: '}{rec.reviewer.fullName}</span>
+                                    )}
+                                    <span>• {new Date(rec.createdAt).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')}</span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
+
+                    {/* SECTION 5: AUDIT TRAIL */}
+                    {detailSection === 'audit' && (
+                      <div className="bg-surface border border-line rounded-2xl overflow-hidden shadow-sm">
+                        <div className="p-4 bg-elevated/40 border-b border-line flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-ink-primary flex items-center gap-2">
+                            <IconAudit className="size-4 text-gold-500" />
+                            <span>{lang === 'ar' ? 'سجل العمليات الإدارية والأمنية المرتبطة بالحساب' : 'Audit Trail for This Account'}</span>
+                          </h4>
+                          <span className="text-[11px] text-ink-muted">
+                            {userDetail.auditLogs.length} {lang === 'ar' ? 'عملية مسجلة' : 'records'}
+                          </span>
+                        </div>
+
+                        <div className="divide-y divide-line/60 text-xs">
+                          {userDetail.auditLogs.length === 0 ? (
+                            <div className="p-12 text-center text-ink-muted">
+                              {lang === 'ar' ? 'لا توجد سجلات تدقيق سابقة لهذا الحساب' : 'No audit records found'}
+                            </div>
+                          ) : (
+                            userDetail.auditLogs.map((log) => (
+                              <div key={log.id} className="p-4 space-y-1.5 hover:bg-elevated/30 transition">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-ink-primary font-mono text-xs">
+                                    {log.action}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-ink-muted">
+                                    {new Date(log.createdAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-ink-secondary flex flex-wrap items-center gap-3">
+                                  <span className="px-2 py-0.5 rounded bg-elevated border border-line text-[10px]">
+                                    Category: {log.category}
+                                  </span>
+                                  {log.result && (
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.result === 'SUCCESS' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                      {log.result}
+                                    </span>
                                   )}
-                                  <span>• {new Date(rec.createdAt).toLocaleDateString(lang === 'ar' ? 'ar-SA' : 'en-US')}</span>
+                                  {log.ip && <span className="font-mono text-ink-muted">IP: {log.ip}</span>}
+                                  {log.reason && <span>{log.reason}</span>}
                                 </div>
                               </div>
                             ))
                           )}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </>
+                ) : null}
+              </div>
 
-                  {/* TAB 5: AUDIT TRAIL */}
-                  {detailTab === 'audit' && (
-                    <div className="bg-surface border border-line rounded-xl overflow-hidden">
-                      <div className="p-3 bg-elevated/40 border-b border-line flex items-center gap-2">
-                        <IconAudit className="size-4 text-gold-500" />
-                        <h4 className="text-xs font-bold text-ink-primary">
-                          {lang === 'ar' ? 'سجل العمليات الإدارية والأمنية المرتبطة بالحساب' : 'Audit Trail for This Account'}
-                        </h4>
-                      </div>
-                      <div className="divide-y divide-line/60 text-xs">
-                        {userDetail.auditLogs.length === 0 ? (
-                          <div className="p-6 text-center text-ink-muted">
-                            {lang === 'ar' ? 'لا توجد سجلات تدقيق سابقة' : 'No audit records'}
-                          </div>
-                        ) : (
-                          userDetail.auditLogs.map((log) => (
-                            <div key={log.id} className="p-3 space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className="font-semibold text-ink-primary">{log.action}</span>
-                                <span className="text-[10px] font-mono text-ink-muted">
-                                  {new Date(log.createdAt).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
-                                </span>
-                              </div>
-                              <div className="text-[11px] text-ink-muted flex items-center gap-3">
-                                <span>Category: {log.category}</span>
-                                {log.ip && <span>IP: {log.ip}</span>}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : null}
             </div>
+
           </div>
         </div>
       )}
 
-      {/* Suspend Confirmation Modal */}
+      {/* ============================================================ */}
+      {/* MODAL 1: SUSPEND CONFIRMATION MODAL */}
+      {/* ============================================================ */}
       {showSuspendModal && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-surface border border-line rounded-2xl p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-surface border border-line rounded-2xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3 text-rose-500">
-              <IconAlert className="size-6 shrink-0" />
+              <div className="size-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                <IconAlert className="size-5" />
+              </div>
               <h3 className="text-base font-bold text-ink-primary">
                 {lang === 'ar' ? 'تأكيد تعليق الحساب' : 'Confirm Account Suspension'}
               </h3>
             </div>
             <p className="text-xs text-ink-secondary leading-relaxed">
               {lang === 'ar'
-                ? 'تعليق الحساب سيؤدي إلى حظر دخول المستخدم فورًا وإسقاط كافة جلساته النشطة وإرسال بريد إلكتروني رسمي له بالسبب.'
-                : 'Suspending this account terminates active sessions and notifies the user.'}
+                ? 'تعليق الحساب سيؤدي إلى حظر دخول المستخدم فوراً، وإسقاط كافة جلساته النشطة، وتسجيل سبب التعليق في سجل التدقيق.'
+                : 'Suspending this account immediately blocks logins and terminates all active user sessions.'}
             </p>
             <div>
-              <label className="block text-xs font-semibold text-ink-muted mb-1">
-                {lang === 'ar' ? 'سبب التعليق الإداري (إلزامي)' : 'Suspension Reason *'}
+              <label className="block text-xs font-semibold text-ink-muted mb-1.5">
+                {lang === 'ar' ? 'سبب التعليق الإداري (إلزامي) *' : 'Suspension Reason (Required) *'}
               </label>
               <textarea
                 rows={3}
                 required
                 value={suspendReason}
                 onChange={(e) => setSuspendReason(e.target.value)}
-                placeholder={lang === 'ar' ? 'اكتب سبب التعليق...' : 'Enter reason'}
-                className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-rose-500 outline-none"
+                placeholder={lang === 'ar' ? 'اكتب سبب التعليق بالتفصيل...' : 'Enter reason'}
+                className="w-full p-3 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-rose-500 outline-none"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowSuspendModal(false)}
-                className="px-4 py-2 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
+                className="px-4 py-2.5 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
               >
                 {lang === 'ar' ? 'إلغاء' : 'Cancel'}
               </button>
@@ -1600,21 +2026,65 @@ export default function AdminUserManagement() {
                 type="button"
                 onClick={handleSuspend}
                 disabled={suspending || !suspendReason.trim()}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-xs transition"
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-bold text-xs transition"
               >
-                {suspending ? 'جاري التعليق...' : 'تأكيد تعليق الحساب'}
+                {suspending ? (lang === 'ar' ? 'جاري التعليق...' : 'Suspending...') : (lang === 'ar' ? 'تأكيد تعليق الحساب' : 'Confirm Suspension')}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Dual Admin Review Modal */}
+      {/* ============================================================ */}
+      {/* MODAL 2: PASSWORD RECOVERY CONFIRMATION MODAL */}
+      {/* ============================================================ */}
+      {showPasswordRecoveryConfirm && userDetail && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-surface border border-line rounded-2xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-gold-500">
+              <div className="size-10 rounded-xl bg-gold-500/10 border border-gold-500/20 flex items-center justify-center">
+                <IconKey className="size-5" />
+              </div>
+              <h3 className="text-base font-bold text-ink-primary">
+                {lang === 'ar' ? 'تأكيد إرسال رابط الاستعادة' : 'Confirm Password Recovery'}
+              </h3>
+            </div>
+            <p className="text-xs text-ink-secondary leading-relaxed">
+              {lang === 'ar'
+                ? `هل أنت متأكد من إرسال رابط استعادة كلمة المرور المشفر إلى البريد الأصلي المسجل (${userDetail.email})؟ الرابط سيكون صالحاً لمدة 30 دقيقة فقط.`
+                : `Are you sure you want to send a secure password recovery link to (${userDetail.email})?`}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPasswordRecoveryConfirm(false)}
+                className="px-4 py-2.5 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
+              >
+                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSendRecoveryEmail}
+                disabled={sendingRecoveryEmail}
+                className="px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 disabled:opacity-40 text-slate-950 font-bold text-xs transition"
+              >
+                {sendingRecoveryEmail ? (lang === 'ar' ? 'جاري الإرسال...' : 'Sending...') : (lang === 'ar' ? 'تأكيد الإرسال الآن' : 'Confirm & Send')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 3: DUAL-ADMIN REVIEW MODAL */}
+      {/* ============================================================ */}
       {reviewRecoveryItem && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-surface border border-line rounded-2xl p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-surface border border-line rounded-2xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3">
-              <IconShieldKeyhole className="size-6 text-gold-500 shrink-0" />
+              <div className="size-10 rounded-xl bg-gold-500/10 border border-gold-500/20 text-gold-500 flex items-center justify-center shrink-0">
+                <IconShieldKeyhole className="size-5" />
+              </div>
               <div>
                 <h3 className="text-base font-bold text-ink-primary">
                   {lang === 'ar' ? 'الاعتماد المزدوج لطلب الاستعادة' : 'Dual-Admin Recovery Approval'}
@@ -1623,7 +2093,7 @@ export default function AdminUserManagement() {
               </div>
             </div>
 
-            <div className="bg-elevated/50 border border-line rounded-xl p-3 text-xs space-y-1.5">
+            <div className="bg-elevated/40 border border-line rounded-xl p-4 text-xs space-y-2">
               <div className="flex justify-between">
                 <span className="text-ink-muted">{lang === 'ar' ? 'صاحب الحساب:' : 'User:'}</span>
                 <span className="font-semibold text-ink-primary">{reviewRecoveryItem.user.fullName}</span>
@@ -1646,17 +2116,19 @@ export default function AdminUserManagement() {
               </div>
             </div>
 
-            {/* Security Check Warning */}
+            {/* Self-Approval Block */}
             {reviewRecoveryItem.initiator.id === currentAdmin?.id ? (
-              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-xs text-rose-600 font-semibold leading-relaxed">
+              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3.5 text-xs text-rose-600 font-semibold leading-relaxed">
                 {lang === 'ar'
-                  ? 'مخالفة أمنية: لا يمكنك اعتماد هذا الطلب لأنك أنت من أنشأه. يتطلب الاعتماد المزدوج مراجعة مشرف آخر مصرح له.'
+                  ? 'مخالفة أمنية: لا يمكنك اعتماد هذا الطلب لأنك أنت من أنشأه. يتطلب الاعتماد المزدوج مراجعة مشرف إداري آخر مصرح له.'
                   : 'Dual-approval violation: You cannot approve a request that you initiated.'}
               </div>
             ) : (
               <div className="space-y-3 text-xs">
                 <div>
-                  <label className="block text-ink-muted mb-1 font-semibold">{lang === 'ar' ? 'قرار المشرف' : 'Decision'}</label>
+                  <label className="block text-ink-muted mb-1.5 font-semibold">
+                    {lang === 'ar' ? 'قرار المشرف *' : 'Decision *'}
+                  </label>
                   <div className="flex gap-4">
                     <label className="flex items-center gap-2 cursor-pointer font-bold text-emerald-600">
                       <input
@@ -1680,13 +2152,15 @@ export default function AdminUserManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-ink-muted mb-1 font-semibold">{lang === 'ar' ? 'ملاحظات المراجعة' : 'Review Notes'}</label>
+                  <label className="block text-ink-muted mb-1 font-semibold">
+                    {lang === 'ar' ? 'ملاحظات المراجعة' : 'Review Notes'}
+                  </label>
                   <textarea
                     rows={2}
                     value={reviewNotes}
                     onChange={(e) => setReviewNotes(e.target.value)}
                     placeholder={lang === 'ar' ? 'تم تدقيق المستندات والموافقة على التفعيل...' : 'Notes'}
-                    className="w-full px-3 py-2 rounded-lg bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
+                    className="w-full p-2.5 rounded-xl bg-surface border border-line text-ink-primary text-xs focus:border-gold-500 outline-none"
                   />
                 </div>
               </div>
@@ -1696,7 +2170,7 @@ export default function AdminUserManagement() {
               <button
                 type="button"
                 onClick={() => setReviewRecoveryItem(null)}
-                className="px-4 py-2 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
+                className="px-4 py-2.5 rounded-xl bg-elevated border border-line text-xs font-semibold hover:bg-elevated/80 transition"
               >
                 {lang === 'ar' ? 'إغلاق' : 'Close'}
               </button>
@@ -1704,16 +2178,21 @@ export default function AdminUserManagement() {
                 type="button"
                 onClick={handleSubmitReview}
                 disabled={submittingReview || reviewRecoveryItem.initiator.id === currentAdmin?.id}
-                className={`px-5 py-2 rounded-xl text-xs font-bold text-white transition disabled:opacity-40 ${
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white transition disabled:opacity-40 ${
                   reviewDecision === 'APPROVED' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'
                 }`}
               >
-                {submittingReview ? 'جاري الاعتماد...' : reviewDecision === 'APPROVED' ? 'تأكيد الاعتماد والإرسال' : 'تأكيد الرفض'}
+                {submittingReview
+                  ? (lang === 'ar' ? 'جاري الاعتماد...' : 'Submitting...')
+                  : reviewDecision === 'APPROVED'
+                  ? (lang === 'ar' ? 'تأكيد الاعتماد والإرسال' : 'Confirm & Approve')
+                  : (lang === 'ar' ? 'تأكيد الرفض' : 'Confirm Rejection')}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

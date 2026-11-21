@@ -1192,6 +1192,7 @@ export interface AdminUserDetail {
     result: string;
     createdAt: string;
     ip?: string | null;
+    reason?: string | null;
     oldValues?: any;
     newValues?: any;
   }>;
