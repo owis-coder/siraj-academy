@@ -1112,7 +1112,7 @@
   "settings.profile.failed": "Could not save the details.",
   "settings.profile.levelHint": "Optional",
   "settings.profile.levelPlaceholder": "Example: fourth year",
-  "settings.profile.phoneHint": "Optional — example: 0512345678",
+  "settings.profile.phoneHint": "Available for all countries — local or international",
   "settings.profile.save": "Save details",
   "settings.profile.saved": "Your basic details were saved.",
   "settings.profile.subtitle": "Name, mobile, university, and major — editable any time; all optional except the name.",

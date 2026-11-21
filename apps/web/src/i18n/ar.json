@@ -1112,7 +1112,7 @@
   "settings.profile.failed": "تعذّر حفظ البيانات.",
   "settings.profile.levelHint": "اختياري",
   "settings.profile.levelPlaceholder": "مثال: المستوى الرابع",
-  "settings.profile.phoneHint": "اختياري — مثال: 0512345678",
+  "settings.profile.phoneHint": "اختياري — متاح لجميع الدول بدون اشتراط رقم محلي محدد",
   "settings.profile.save": "حفظ البيانات",
   "settings.profile.saved": "تم حفظ بياناتك الأساسية.",
   "settings.profile.subtitle": "الاسم والجوال والجامعة والتخصص — يمكن تعديلها في أي وقت، وكلها اختيارية عدا الاسم.",

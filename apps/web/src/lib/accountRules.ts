@@ -4,7 +4,7 @@
 export const FULL_NAME_RE = /^[\u0621-\u064Aa-zA-Z\s'’\u0640-]+$/;
 export const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const PHONE_RE = /^(?:\+?9665\d{8}|05\d{8})$/;
+export const PHONE_RE = /^\+?[0-9\s\-()]{6,20}$/;
 
 export function fullNameError(name: string): string | null {
   const v = name.trim();

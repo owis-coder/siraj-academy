@@ -417,43 +417,56 @@ export default function AccountSettings() {
       {/* البيانات الأساسية */}
       <Card className="p-6">
         <h2 className="mb-1 font-bold text-gold-200">{t('settings.profile.title')}</h2>
-        <p className="mb-5 text-xs text-ink-muted">{t('settings.profile.subtitle')}</p>
+        <p className="mb-5 text-xs text-ink-muted">
+          {user?.role === 'TEACHER'
+            ? 'الاسم ورقم التواصل والبريد الإلكتروني — بياناتك الأساسية.'
+            : t('settings.profile.subtitle')}
+        </p>
         <Form onSubmit={saveProfile} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('common.fullName')} required error={profileErr ?? undefined}>
               <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </Field>
             <Field label={t('common.phone')} hint={t('settings.profile.phoneHint')}>
-              <Input dir="ltr" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+              <Input dir="ltr" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="مثال: +966... أو 05... أو أي رقم دولي" />
             </Field>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('common.university')}>
-              <Select
-                value={universityId}
-                onChange={(e) => {
-                  setUniversityId(e.target.value);
-                  setMajorId('');
-                }}
-              >
-                <option value="">—</option>
-                {unis.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </Select>
+          {user?.role === 'TEACHER' && (
+            <Field label={t('common.email')} hint="لتغيير البريد الإلكتروني، استخدم قسم «البريد الإلكتروني» بالأسفل">
+              <Input dir="ltr" value={user?.email ?? ''} readOnly className="opacity-80 bg-surface-2 cursor-not-allowed" />
             </Field>
-            <Field label={t('common.major')}>
-              <Select value={majorId} onChange={(e) => setMajorId(e.target.value)} disabled={!universityId || majors.length === 0}>
-                <option value="">—</option>
-                {majors.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-          <Field label={t('common.level')} hint={t('settings.profile.levelHint')}>
-            <Input value={level} onChange={(e) => setLevel(e.target.value)} placeholder={t('settings.profile.levelPlaceholder')} />
-          </Field>
+          )}
+          {user?.role !== 'TEACHER' && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t('common.university')}>
+                  <Select
+                    value={universityId}
+                    onChange={(e) => {
+                      setUniversityId(e.target.value);
+                      setMajorId('');
+                    }}
+                  >
+                    <option value="">—</option>
+                    {unis.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label={t('common.major')}>
+                  <Select value={majorId} onChange={(e) => setMajorId(e.target.value)} disabled={!universityId || majors.length === 0}>
+                    <option value="">—</option>
+                    {majors.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+              <Field label={t('common.level')} hint={t('settings.profile.levelHint')}>
+                <Input value={level} onChange={(e) => setLevel(e.target.value)} placeholder={t('settings.profile.levelPlaceholder')} />
+              </Field>
+            </>
+          )}
           <Button type="submit" loading={savingProfile}>{t('settings.profile.save')}</Button>
         </Form>
       </Card>

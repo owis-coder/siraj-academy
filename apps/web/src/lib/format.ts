@@ -155,5 +155,10 @@ export function whatsappLink(numbers: string | string[] | null | undefined): str
   if (!numbers) return null;
   const list = Array.isArray(numbers) ? numbers : String(numbers).split(/[,،]/);
   const first = list[0]?.replace(/\D/g, '');
-  return first ? `https://wa.me/${first.replace(/^0+/, '966')}`.replace('966966', '966') : null;
+  if (!first) return null;
+  if (first.startsWith('05')) {
+    return `https://wa.me/966${first.slice(1)}`;
+  }
+  const cleaned = first.replace(/^0+/, '');
+  return `https://wa.me/${cleaned}`;
 }
