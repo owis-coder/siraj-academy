@@ -548,9 +548,9 @@ router.post(
 );
 
 // ---------- استكمال بيانات التسجيل لحسابات OAuth (Google) ----------
+// لا تتطلب كابتشا إضافية لأن هوية المستخدم وبشريته تم التحقق منها رسميًا وتوقيعها عبر Google OAuth
 router.post(
   "/register/complete-oauth",
-  requireCaptcha("REGISTER"),
   parseBody(completeOAuthSchema),
   asyncHandler(async (req, res) => {
     const data = req.body;
