@@ -14,12 +14,11 @@ import { audit } from "../lib/audit";
 
 const router = Router();
 
-// مسارات الطلبات المخصصة تتطلب تسجيل الدخول
-router.use(requireAuth());
-
-// ---------- تقديم طلب خدمة مخصصة / شرح غير متوفر ----------
+// مسارات تقديم ومتابعة الطلبات المخصصة (مخصصة للطلاب بصفتهم طالبي خدمات تعليمية)
+// الإدارة تدير الطلبات عبر /admin/custom-requests
 router.post(
   "/",
+  requireAuth("STUDENT"),
   parseBody(createCustomRequestSchema),
   asyncHandler(async (req, res) => {
     const data = req.body;
@@ -152,9 +151,10 @@ router.post(
   }),
 );
 
-// ---------- قائمة طلبات المستخدم الحالي ----------
+// ---------- قائمة طلبات المستخدم الحالي (طالب) ----------
 router.get(
   "/mine",
+  requireAuth("STUDENT"),
   parseQuery(listCustomRequestsQuerySchema),
   asyncHandler(async (req, res) => {
     const { status, requestType, q, page, limit } = req.query as any;
@@ -186,9 +186,10 @@ router.get(
   }),
 );
 
-// ---------- تفاصيل طلب مخصص محدد ----------
+// ---------- تفاصيل طلب مخصص محدد (صاحب الطلب أو الإدارة) ----------
 router.get(
   "/:id",
+  requireAuth("STUDENT", "ADMIN"),
   asyncHandler(async (req, res) => {
     const item = await prisma.customServiceRequest.findUnique({
       where: { id: req.params.id },

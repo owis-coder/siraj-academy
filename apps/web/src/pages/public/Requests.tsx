@@ -61,10 +61,20 @@ export default function Requests() {
         title={t('requests.title')}
         subtitle={t('requests.subtitle')}
         action={
-          <div className="flex flex-wrap gap-2">
-            <Link to="/requests/new"><Button>{t('requests.requestPrivate')}</Button></Link>
-            <Link to="/requests/custom"><Button variant="outline">{t('requests.requestCustom')}</Button></Link>
-          </div>
+          user?.role === 'TEACHER' ? (
+            <Link to="/teacher/requests">
+              <Button>{t('requests.teacherViewAvailable')}</Button>
+            </Link>
+          ) : user?.role === 'ADMIN' ? (
+            <Link to="/admin/requests">
+              <Button>{t('requests.adminManage')}</Button>
+            </Link>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Link to="/requests/new"><Button>{t('requests.requestPrivate')}</Button></Link>
+              <Link to="/requests/custom"><Button variant="outline">{t('requests.requestCustom')}</Button></Link>
+            </div>
+          )
         }
       />
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

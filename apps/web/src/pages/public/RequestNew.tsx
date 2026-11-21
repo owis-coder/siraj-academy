@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, type University, type College, type Major } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
@@ -96,10 +96,14 @@ export default function RequestNew() {
   const back = () => setStep((s) => Math.max(1, s - 1));
 
   const submit = async () => {
-    // الإرسال متاح لمن لديه حساب (مسار مبسط). للزائر: نوجّهه للتسجيل أولاً.
+    // الإرسال متاح للطلاب المسجلين فقط
     if (!user) {
       toast.push('info', t('requestNew.loginFirst'));
       nav('/login', { state: { from: '/requests/new' } });
+      return;
+    }
+    if (user.role !== 'STUDENT') {
+      toast.push('error', t('requestNew.studentOnlyToast'));
       return;
     }
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
@@ -138,16 +142,36 @@ export default function RequestNew() {
         action={<Badge tone="gold">{t('requestNew.stepsBadge')}</Badge>}
       />
 
-      <Steps
-        current={step}
-        steps={[
-          { key: '1', label: t('requestNew.step1') },
-          { key: '2', label: t('requestNew.step2') },
-          { key: '3', label: t('requestNew.step3') },
-        ]}
-        onGo={(s) => s < step && setStep(s)}
-        className="mb-8"
-      />
+      {user && user.role !== 'STUDENT' ? (
+        <Card className="border-gold-500/30 bg-gold-500/10 p-8 text-center">
+          <p className="text-lg font-bold text-gold-200">{t('requestNew.studentOnlyTitle')}</p>
+          <p className="mt-2 text-sm text-ink-muted">
+            {user.role === 'TEACHER'
+              ? t('requestNew.teacherNotice')
+              : t('requestNew.adminNotice')}
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <Link to={user.role === 'TEACHER' ? '/teacher/requests' : '/admin/requests'}>
+              <Button>
+                {user.role === 'TEACHER'
+                  ? t('requestNew.toTeacherRequests')
+                  : t('requestNew.toAdminRequests')}
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <Steps
+            current={step}
+            steps={[
+              { key: '1', label: t('requestNew.step1') },
+              { key: '2', label: t('requestNew.step2') },
+              { key: '3', label: t('requestNew.step3') },
+            ]}
+            onGo={(s) => s < step && setStep(s)}
+            className="mb-8"
+          />
 
       <Card className="p-6 sm:p-8">
         {step === 1 && (
@@ -241,6 +265,8 @@ export default function RequestNew() {
           </Form>
         )}
       </Card>
+        </>
+      )}
     </div>
   );
 }

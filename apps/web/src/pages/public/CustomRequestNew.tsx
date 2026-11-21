@@ -104,6 +104,10 @@ export default function CustomRequestNew() {
       nav('/login', { state: { from: '/requests/custom' } });
       return;
     }
+    if (user.role !== 'STUDENT') {
+      toast.push('error', t('customRequest.studentOnlyToast'));
+      return;
+    }
     if (!validate()) {
       toast.push('error', t('customRequest.requiredErr'));
       return;
@@ -149,35 +153,55 @@ export default function CustomRequestNew() {
         action={<Badge tone="gold">{t('customRequest.badge')}</Badge>}
       />
 
-      {/* تنبيه تسجيل الدخول واستخراج البيانات التلقائي */}
-      {!user ? (
-        <Card className="mb-8 border-gold-500/30 bg-gold-500/10 p-6 text-center">
-          <p className="text-base font-semibold text-gold-200">{t('customRequest.loginTitle')}</p>
-          <p className="mt-1 text-sm text-ink-muted">{t('customRequest.loginHint')}</p>
-          <div className="mt-4 flex justify-center gap-3">
-            <Link to="/login" state={{ from: '/requests/custom' }}>
-              <Button>{t('common.login')}</Button>
-            </Link>
-            <Link to="/register">
-              <Button variant="outline">{t('customRequest.createAccount')}</Button>
+      {/* تنبيه دور المستخدم أو تسجيل الدخول */}
+      {user && user.role !== 'STUDENT' ? (
+        <Card className="border-gold-500/30 bg-gold-500/10 p-8 text-center">
+          <p className="text-lg font-bold text-gold-200">{t('customRequest.studentOnlyTitle')}</p>
+          <p className="mt-2 text-sm text-ink-muted">
+            {user.role === 'TEACHER'
+              ? t('customRequest.teacherNotice')
+              : t('customRequest.adminNotice')}
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <Link to={user.role === 'TEACHER' ? '/teacher/requests' : '/admin/custom-requests'}>
+              <Button>
+                {user.role === 'TEACHER'
+                  ? t('customRequest.toTeacherRequests')
+                  : t('customRequest.toAdminRequests')}
+              </Button>
             </Link>
           </div>
         </Card>
       ) : (
-        <Card className="mb-6 border-line bg-elevated/40 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <div>
-              <p className="font-semibold text-ink-primary">
-                {t('customRequest.requester')} <span className="text-gold-200">{user.fullName}</span> ({roleLabel})
-              </p>
-              <p className="text-xs text-ink-muted">
-                {t('customRequest.email')}: {user.email} | {t('customRequest.phone')}: {user.whatsapp || t('customRequest.notRegistered')} | {t('customRequest.university')}: {user.university?.name || t('customRequest.none')}
-              </p>
-            </div>
-            <Badge tone="ok">{t('customRequest.dataTrusted')}</Badge>
-          </div>
-        </Card>
-      )}
+        <>
+          {!user ? (
+            <Card className="mb-8 border-gold-500/30 bg-gold-500/10 p-6 text-center">
+              <p className="text-base font-semibold text-gold-200">{t('customRequest.loginTitle')}</p>
+              <p className="mt-1 text-sm text-ink-muted">{t('customRequest.loginHint')}</p>
+              <div className="mt-4 flex justify-center gap-3">
+                <Link to="/login" state={{ from: '/requests/custom' }}>
+                  <Button>{t('common.login')}</Button>
+                </Link>
+                <Link to="/register">
+                  <Button variant="outline">{t('customRequest.createAccount')}</Button>
+                </Link>
+              </div>
+            </Card>
+          ) : (
+            <Card className="mb-6 border-line bg-elevated/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div>
+                  <p className="font-semibold text-ink-primary">
+                    {t('customRequest.requester')} <span className="text-gold-200">{user.fullName}</span> ({roleLabel})
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    {t('customRequest.email')}: {user.email} | {t('customRequest.phone')}: {user.whatsapp || t('customRequest.notRegistered')} | {t('customRequest.university')}: {user.university?.name || t('customRequest.none')}
+                  </p>
+                </div>
+                <Badge tone="ok">{t('customRequest.dataTrusted')}</Badge>
+              </div>
+            </Card>
+          )}
 
       <Card className="p-6 sm:p-8">
         <Form onSubmit={handleSubmit} className="space-y-6">
@@ -322,6 +346,8 @@ export default function CustomRequestNew() {
           </div>
         </Form>
       </Card>
+        </>
+      )}
     </div>
   );
 }
