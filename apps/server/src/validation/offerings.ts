@@ -2,17 +2,23 @@ import { z } from "zod";
 import { paginationSchema } from "./common";
 
 export const createOfferingSchema = z.object({
-  courseId: z.string().min(1, "حدد المقرر"),
+  courseId: z.string().optional(),
+  courseTitle: z.string().trim().min(2, "اسم المقرر يجب ألا يقل عن حرفين").optional(),
   title: z.string().trim().max(200).optional(),
-  summary: z.string().trim().min(20, "وصف الدورة 20 حرفًا على الأقل").max(2000),
+  summary: z.string().trim().min(1, "وصف الدورة مطلوب").max(2000),
   price: z.coerce.number().min(0, "السعر لا يمكن أن يكون سالبًا").max(100000),
   trialVideoUrl: z.string().url("رابط الفيديو الترويجي غير صحيح").max(400).optional(),
   youtubeUrls: z.array(z.string().url().max(400)).max(30).optional(),
+}).refine((d) => Boolean(d.courseId || d.courseTitle), {
+  message: "اختر مقررًا أو اكتب اسم المقرر يدويًا",
+  path: ["courseId"],
 });
 
 export const updateOfferingSchema = z.object({
+  courseId: z.string().optional(),
+  courseTitle: z.string().trim().min(2).optional(),
   title: z.string().trim().max(200).optional(),
-  summary: z.string().trim().min(20).max(2000).optional(),
+  summary: z.string().trim().min(1).max(2000).optional(),
   price: z.coerce.number().min(0).max(100000).optional(),
   trialVideoUrl: z.string().url().max(400).nullable().optional(),
   youtubeUrls: z.array(z.string().url().max(400)).max(30).nullable().optional(),

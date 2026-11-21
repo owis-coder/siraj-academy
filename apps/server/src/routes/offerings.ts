@@ -39,16 +39,46 @@ router.post(
   requireApprovedTeacher(),
   parseBody(createOfferingSchema),
   asyncHandler(async (req, res) => {
-    const data = req.body;
+    const data = req.body as {
+      courseId?: string;
+      courseTitle?: string;
+      title?: string;
+      summary: string;
+      price: number;
+      trialVideoUrl?: string;
+      youtubeUrls?: string[];
+    };
     const profile = await prisma.teacherProfile.findUnique({ where: { userId: req.user!.id } });
     if (!profile) throw notFound("ملف المدرس غير موجود");
 
-    const course = await prisma.course.findUnique({ where: { id: data.courseId } });
-    if (!course || !course.isVisible) throw badRequest("المقرر غير موجود أو معطل — اختر مقررًا مرئيًا");
+    let course;
+    if (data.courseId) {
+      course = await prisma.course.findUnique({ where: { id: data.courseId } });
+    }
+    if (!course && data.courseTitle) {
+      course = await prisma.course.findFirst({
+        where: { title: { equals: data.courseTitle.trim(), mode: "insensitive" } },
+      });
+      if (!course) {
+        const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+        const university =
+          (user?.universityId ? await prisma.university.findUnique({ where: { id: user.universityId } }) : null) ||
+          (await prisma.university.findFirst());
+        if (!university) throw badRequest("لا توجد جامعة مسجلة لربط المقرر");
+        course = await prisma.course.create({
+          data: {
+            title: data.courseTitle.trim(),
+            universityId: university.id,
+            isVisible: true,
+          },
+        });
+      }
+    }
+    if (!course || !course.isVisible) throw badRequest("المقرر غير موجود أو معطل — اختر مقررًا مرئيًا أو اكتب اسمه");
 
     const offering = await prisma.courseOffering.create({
       data: {
-        courseId: data.courseId,
+        courseId: course.id,
         teacherId: profile.id,
         title: data.title,
         summary: data.summary,
@@ -148,17 +178,50 @@ router.patch(
     const offering = await getOwnedOffering(req.params.id, req.user!.id, isAdmin);
 
     const data = req.body as {
-      title?: string; summary?: string; price?: number;
-      trialVideoUrl?: string | null; youtubeUrls?: string[] | null; status?: "DRAFT" | "PUBLISHED" | "HIDDEN";
+      courseId?: string;
+      courseTitle?: string;
+      title?: string;
+      summary?: string;
+      price?: number;
+      trialVideoUrl?: string | null;
+      youtubeUrls?: string[] | null;
+      status?: "DRAFT" | "PUBLISHED" | "HIDDEN";
     };
 
     if (data.status === "PUBLISHED" && !isAdmin) {
       throw badRequest("نشر الدورة قرار إداري؛ قدّم الدورة للمراجعة عبر /offerings/:id/submit");
     }
 
+    let newCourseId: string | undefined;
+    if (data.courseId) {
+      const c = await prisma.course.findUnique({ where: { id: data.courseId } });
+      if (c) newCourseId = c.id;
+    } else if (data.courseTitle) {
+      let c = await prisma.course.findFirst({
+        where: { title: { equals: data.courseTitle.trim(), mode: "insensitive" } },
+      });
+      if (!c) {
+        const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+        const university =
+          (user?.universityId ? await prisma.university.findUnique({ where: { id: user.universityId } }) : null) ||
+          (await prisma.university.findFirst());
+        if (university) {
+          c = await prisma.course.create({
+            data: {
+              title: data.courseTitle.trim(),
+              universityId: university.id,
+              isVisible: true,
+            },
+          });
+        }
+      }
+      if (c) newCourseId = c.id;
+    }
+
     const updated = await prisma.courseOffering.update({
       where: { id: offering.id },
       data: {
+        ...(newCourseId ? { courseId: newCourseId } : {}),
         ...(data.title !== undefined ? { title: data.title } : {}),
         ...(data.summary !== undefined ? { summary: data.summary } : {}),
         ...(data.price !== undefined

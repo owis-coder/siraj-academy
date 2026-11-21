@@ -174,6 +174,8 @@ export function TeacherOfferings() {
 function OfferingEditor({ offering, courses, onClose, onSaved }: { offering?: Offering; courses: Course[]; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const { t } = useI18n();
+  const [courseMode, setCourseMode] = useState<'select' | 'manual'>('select');
+  const [customCourseTitle, setCustomCourseTitle] = useState('');
   const [title, setTitle] = useState(offering?.title ?? '');
   const [courseId, setCourseId] = useState(offering?.courseId ?? '');
   const [summary, setSummary] = useState(offering?.summary ?? '');
@@ -184,14 +186,21 @@ function OfferingEditor({ offering, courses, onClose, onSaved }: { offering?: Of
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    if (!courseId) { toast.push('error', t('td.chooseCourse')); return; }
-    if (!summary.trim() || summary.trim().length < 20) {
-      toast.push('error', t('td.summaryMin'));
+    const finalCourseId = courseMode === 'select' ? (courseId || undefined) : undefined;
+    const finalCourseTitle = courseMode === 'manual' ? customCourseTitle.trim() : undefined;
+
+    if (!finalCourseId && !finalCourseTitle) {
+      toast.push('error', 'يرجى تحديد المقرر أو كتابة اسمه يدويًا');
+      return;
+    }
+    if (!summary.trim()) {
+      toast.push('error', 'يرجى كتابة وصف الدورة');
       return;
     }
     const validLessons = lessons.filter((l) => l.title.trim() && l.videoUrl.trim());
     const payload = {
-      courseId,
+      courseId: finalCourseId,
+      courseTitle: finalCourseTitle,
       title: title.trim() || undefined,
       summary: summary.trim(),
       price: Number(price) || 0,
@@ -233,20 +242,62 @@ function OfferingEditor({ offering, courses, onClose, onSaved }: { offering?: Of
     <Modal open onClose={onClose} title={offering ? t('td.editCourse') : t('td.newCourse')} wide>
       <Form onSubmit={save} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('td.subject')} required hint={t('td.subjectHint')}>
-            <Select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-              <option value="">{t('td.choose')}</option>
-              {courses.map((c) => <option key={c.id} value={c.id}>{c.title}{c.code ? ` (${c.code})` : ''}</option>)}
-            </Select>
-          </Field>
-          <Field label={t('td.priceLabel')} required hint={t('td.freeZeroHint')}>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="block text-sm font-medium text-ink-secondary">
+                {t('td.subject')} <span className="text-coral">*</span>
+              </span>
+              <div className="flex rounded-lg border border-line bg-elevated/40 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setCourseMode('select')}
+                  className={`rounded-md px-2.5 py-0.5 transition-all ${
+                    courseMode === 'select'
+                      ? 'bg-surface font-semibold text-gold-300 shadow-sm'
+                      : 'text-ink-muted hover:text-ink-primary'
+                  }`}
+                >
+                  قائمة المقررات
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCourseMode('manual')}
+                  className={`rounded-md px-2.5 py-0.5 transition-all ${
+                    courseMode === 'manual'
+                      ? 'bg-surface font-semibold text-gold-300 shadow-sm'
+                      : 'text-ink-muted hover:text-ink-primary'
+                  }`}
+                >
+                  كتابة يدوية
+                </button>
+              </div>
+            </div>
+            {courseMode === 'select' ? (
+              <Select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+                <option value="">{t('td.choose')}</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                    {c.code ? ` (${c.code})` : ''}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input
+                value={customCourseTitle}
+                onChange={(e) => setCustomCourseTitle(e.target.value)}
+                placeholder="اكتب اسم المقرر / المادة هنا..."
+              />
+            )}
+          </div>
+          <Field label={t('td.priceLabel')} required>
             <Input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
           </Field>
         </div>
-        <Field label={t('td.courseTitle')} hint={t('td.courseTitleHint')}>
+        <Field label={t('td.courseTitle')}>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('td.courseTitlePlaceholder')} />
         </Field>
-        <Field label={t('td.summary')} required hint={t('td.summaryHint')}>
+        <Field label={t('td.summary')} required>
           <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={t('td.summaryPlaceholder')} />
         </Field>
 
