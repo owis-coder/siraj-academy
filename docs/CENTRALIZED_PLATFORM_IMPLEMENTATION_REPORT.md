@@ -129,7 +129,8 @@
 - الفرع: `main`.
 - Remote: GitHub (المستودع المحدد في إعدادات Git).
 - ⚠️ **تنبيه أمني:** Remote URL في `.git/config` يحتوي توكن وصول شخصي مضمّنًا. لم يُطبع ولم يُدرج في أي ملف/Commit. يجب تدوير التوكن واستخدام مدير اعتماد أو SSH بدلًا من تضمينه في الرابط.
-- الـCommit والـPush: موثّقان في نهاية التنفيذ (انظر رسالة التسليم)؛ لم يُستخدم Force Push ولم يُحذف أي فرع.
+- **الـCommit:** `d01c6a4` — `feat(platform): centralize teacher-student communication and gate course publication`.
+- **الـPush:** نجح إلى `origin/main` (`20f0e4f..d01c6a4`) دون Force Push، والفروع لم تُحذف، ولا يوجد تباعد بين المحلي والبعيد (`0 ahead / 0 behind`).
 - ملفات `.env` و`uploads/` و`node_modules` مستثناة عبر `.gitignore`، ولم تُفحص قيم السر.
 
 ## 15) حالة النشر على Vercel
