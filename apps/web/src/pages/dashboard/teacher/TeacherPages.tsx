@@ -527,56 +527,478 @@ function LiveForm({ offerings, onDone }: { offerings: Offering[]; onDone: () => 
   );
 }
 
-/* ================= أرباحي ================= */
+/* ================= أرباحي ومحفظتي ================= */
 export function TeacherEarnings() {
   const { t } = useI18n();
-  const [data, setData] = useState<{
-    gross?: number;
-    dues?: number;
-    commissionRate?: number;
-    total?: number;
-    commission?: number;
-    net?: number;
-    ordersCount?: number;
-    breakdown?: Record<string, unknown>[];
-    rows?: Record<string, unknown>[];
-  } | null>(null);
+  const toast = useToast();
+  const [wallet, setWallet] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'withdrawals' | 'earnings' | 'methods'>('withdrawals');
+
+  // Modal states
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showMethodModal, setShowMethodModal] = useState(false);
+
+  // Form states: Withdrawal
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [selectedMethodId, setSelectedMethodId] = useState('');
+  const [withdrawNotes, setWithdrawNotes] = useState('');
+  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+
+  // Form states: Payout Method
+  const [bankName, setBankName] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState('');
+  const [iban, setIban] = useState('');
+  const [isDefaultMethod, setIsDefaultMethod] = useState(true);
+  const [submittingMethod, setSubmittingMethod] = useState(false);
+
+  const loadWallet = async () => {
+    setLoading(true);
+    try {
+      const res = await api.withdrawals.wallet();
+      setWallet(res.data);
+      if (res.data?.payoutMethods?.length > 0 && !selectedMethodId) {
+        const def = res.data.payoutMethods.find((m: any) => m.isDefault) || res.data.payoutMethods[0];
+        setSelectedMethodId(def.id);
+      }
+    } catch {
+      toast.push('error', 'تعذر تحميل بيانات المحفظة');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api.teacher.earnings().then(({ data }) => setData(data)).catch(() => setData({ rows: [] })).finally(() => setLoading(false));
+    loadWallet();
   }, []);
 
-  const total = Number(data?.gross ?? data?.total ?? 0);
-  const net = Number(data?.dues ?? data?.net ?? 0);
-  const commission = (data?.commissionRate != null ? Math.round(total * data.commissionRate * 100) / 100 : Number(data?.commission ?? 0)) || Math.max(0, total - net);
-  const rows = data?.breakdown ?? data?.rows ?? [];
+  const handleWithdrawSubmit = async () => {
+    const amt = parseFloat(withdrawAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.push('error', 'يرجى إدخال مبلغ سحب صحيح');
+      return;
+    }
+    if (amt < 50) {
+      toast.push('error', 'الحد الأدنى لطلب السحب هو 50 ريال');
+      return;
+    }
+    if (wallet && amt > wallet.availableBalance) {
+      toast.push('error', `المبلغ المطلوب يتجاوز الرصيد المتاح للسحب (${wallet.availableBalance} ريال)`);
+      return;
+    }
+    if (!selectedMethodId) {
+      toast.push('error', 'يرجى اختيار الحساب البنكي لتحويل الأرباح');
+      return;
+    }
+
+    setSubmittingWithdraw(true);
+    try {
+      await api.withdrawals.withdraw({
+        amount: amt,
+        payoutMethodId: selectedMethodId,
+        adminNotes: withdrawNotes,
+      });
+      toast.push('success', 'تم تقديم طلب السحب وحجز الرصيد بنجاح');
+      setShowWithdrawModal(false);
+      setWithdrawAmount('');
+      setWithdrawNotes('');
+      loadWallet();
+    } catch (e: any) {
+      toast.push('error', e.message || 'فشل تقديم طلب السحب');
+    } finally {
+      setSubmittingWithdraw(false);
+    }
+  };
+
+  const handleMethodSubmit = async () => {
+    const cleanIban = iban.trim().replace(/\s+/g, '').toUpperCase();
+    if (!cleanIban.startsWith('SA') || cleanIban.length !== 24) {
+      toast.push('error', 'صيغة الآيبان غير صحيحة، يجب أن يبدأ بـ SA ويتكون من 24 حرفًا ورقمًا');
+      return;
+    }
+    if (!bankName.trim() || !accountHolderName.trim()) {
+      toast.push('error', 'اسم البنك واسم صاحب الحساب مطلوبان');
+      return;
+    }
+
+    setSubmittingMethod(true);
+    try {
+      await api.withdrawals.addPayoutMethod({
+        bankName,
+        accountHolderName,
+        iban: cleanIban,
+        isDefault: isDefaultMethod,
+      });
+      toast.push('success', 'تم حفظ الحساب البنكي بنجاح');
+      setShowMethodModal(false);
+      setBankName('');
+      setAccountHolderName('');
+      setIban('');
+      loadWallet();
+    } catch (e: any) {
+      toast.push('error', e.message || 'فشل حفظ الحساب البنكي');
+    } finally {
+      setSubmittingMethod(false);
+    }
+  };
+
+  const WITHDRAWAL_STATUS_TONE: Record<string, 'ok' | 'warn' | 'coral' | 'teal' | 'gold'> = {
+    PENDING: 'warn',
+    UNDER_REVIEW: 'gold',
+    NEEDS_INFORMATION: 'coral',
+    APPROVED: 'teal',
+    PROCESSING: 'gold',
+    PAID: 'ok',
+    REJECTED: 'coral',
+    FAILED: 'coral',
+    CANCELLED: 'warn',
+  };
+
+  const WITHDRAWAL_STATUS_LABEL: Record<string, string> = {
+    PENDING: 'قيد الانتظار',
+    UNDER_REVIEW: 'تحت المراجعة',
+    NEEDS_INFORMATION: 'مطلوب توضيح',
+    APPROVED: 'معتمد (بانتظار الصرف)',
+    PROCESSING: 'جاري التحويل البنكي',
+    PAID: 'تم التحويل بنجاح',
+    REJECTED: 'مرفوض وتم تحرير الرصيد',
+    FAILED: 'فشل التحويل',
+    CANCELLED: 'ملغي',
+  };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t('td.earningsTitle')}</h1>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label={t('td.grossSales')} value={loading ? null : formatMoney(total)} />
-        <StatCard label={t('td.platformCommission')} value={loading ? null : formatMoney(commission)} tone="coral" />
-        <StatCard label={t('td.netDues')} value={loading ? null : formatMoney(net)} tone="ok" />
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">أرباحي ومحفظتي المالية</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            متابعة استحقاقاتك من مبيعات الدورات والخدمات وإدارة عمليات السحب البنكية
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowMethodModal(true)}>
+            إدارة الحسابات البنكية
+          </Button>
+          <Button
+            onClick={() => setShowWithdrawModal(true)}
+            disabled={!wallet || wallet.availableBalance < 50}
+          >
+            طلب سحب أرباح
+          </Button>
+        </div>
       </div>
-      <Card>
-        {loading ? <Skeleton className="m-4 h-48" /> : !rows.length ? (
-          <EmptyState compact title={t('td.noData')} hint={t('td.earningsEmptyHint')} />
-        ) : (
-          <div className="divide-y divide-line/60">
-            {rows.map((r, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-3 text-sm">
-                <div>
-                  <span className="font-medium text-ink-primary">{String(r.title ?? r.orderNo ?? t('td.operation'))}</span>
-                  {Boolean(r.paidAt) && <span className="ms-2 text-xs text-ink-muted">· {formatDateTime(String(r.paidAt))}</span>}
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="الرصيد المتاح للسحب"
+          value={loading ? null : formatMoney(wallet?.availableBalance ?? 0)}
+          tone="ok"
+        />
+        <StatCard
+          label="رصيد محجوز قيد التحويل"
+          value={loading ? null : formatMoney(wallet?.reservedBalance ?? 0)}
+          tone="coral"
+        />
+        <StatCard
+          label="إجمالي الأرباح المحققة"
+          value={loading ? null : formatMoney(wallet?.earnedTotal ?? 0)}
+          tone="gold"
+        />
+        <StatCard
+          label="إجمالي المسحوبات المحولة"
+          value={loading ? null : formatMoney(wallet?.withdrawnTotal ?? 0)}
+        />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-line text-sm">
+        <button
+          onClick={() => setActiveTab('withdrawals')}
+          className={`px-4 py-2 font-medium border-b-2 transition ${
+            activeTab === 'withdrawals'
+              ? 'border-gold-400 text-gold-300'
+              : 'border-transparent text-ink-muted hover:text-ink'
+          }`}
+        >
+          طلبات السحب ({wallet?.recentWithdrawals?.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab('earnings')}
+          className={`px-4 py-2 font-medium border-b-2 transition ${
+            activeTab === 'earnings'
+              ? 'border-gold-400 text-gold-300'
+              : 'border-transparent text-ink-muted hover:text-ink'
+          }`}
+        >
+          سجل الأرباح والعمولات ({wallet?.recentEarnings?.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab('methods')}
+          className={`px-4 py-2 font-medium border-b-2 transition ${
+            activeTab === 'methods'
+              ? 'border-gold-400 text-gold-300'
+              : 'border-transparent text-ink-muted hover:text-ink'
+          }`}
+        >
+          الحسابات البنكية ({wallet?.payoutMethods?.length || 0})
+        </button>
+      </div>
+
+      {/* Tab 1: Withdrawals */}
+      {activeTab === 'withdrawals' && (
+        <Card className="p-5">
+          {loading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !wallet?.recentWithdrawals?.length ? (
+            <EmptyState
+              compact
+              title="لا توجد طلبات سحب سابقة"
+              hint="عندما يتجاوز رصيدك المتاح 50 ريال، يمكنك طلب تحويل أرباحك لحسابك البنكي"
+              action={
+                <Button size="sm" onClick={() => setShowWithdrawModal(true)} disabled={wallet?.availableBalance < 50}>
+                  طلب سحب جديد
+                </Button>
+              }
+            />
+          ) : (
+            <div className="divide-y divide-line/60">
+              {wallet.recentWithdrawals.map((w: any) => (
+                <div key={w.id} className="flex flex-wrap items-center justify-between gap-4 py-3.5 text-sm">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-gold-300">{w.withdrawalNo}</span>
+                      <span className="text-ink-muted">·</span>
+                      <span className="font-medium text-ink">{w.payoutMethod?.bankName || 'حساب بنكي'}</span>
+                      <span className="font-mono text-xs text-ink-muted" dir="ltr">{w.payoutMethod?.ibanMasked}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-ink-muted">تاريخ الطلب: {formatDateTime(w.createdAt)}</p>
+                    {w.rejectionReason && (
+                      <p className="mt-1 text-xs text-coral">
+                        <span className="font-bold">سبب الرفض:</span> {w.rejectionReason} (تمت إعادة الرصيد لمحفظتك)
+                      </p>
+                    )}
+                    {w.transferReferenceNo && (
+                      <p className="mt-1 text-xs text-ok">
+                        <span className="font-bold">رقم الحوالة البنكية:</span> <span className="font-mono font-bold">{w.transferReferenceNo}</span>
+                      </p>
+                    )}
+                    {w.transferProofUrl && (
+                      <a href={w.transferProofUrl} target="_blank" rel="noreferrer" className="inline-block mt-1 text-xs text-gold-300 underline">
+                        📄 إشعار التحويل البنكي
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Badge tone={WITHDRAWAL_STATUS_TONE[w.status] || 'gold'}>
+                      {WITHDRAWAL_STATUS_LABEL[w.status] || w.status}
+                    </Badge>
+                    <span className="font-mono text-base font-bold text-ink">{formatMoney(w.amount)}</span>
+                  </div>
                 </div>
-                <span className="font-semibold text-gold-300">{formatMoney(Number(r.amount ?? 0))}</span>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Tab 2: Earnings & Commissions */}
+      {activeTab === 'earnings' && (
+        <Card className="p-5">
+          {loading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !wallet?.recentEarnings?.length ? (
+            <EmptyState compact title="لا توجد أرباح مسجلة بعد" hint="ستظهر هنا مبيعات دوراتك وخدماتك فور اعتماد دفعها من الطلاب" />
+          ) : (
+            <div className="divide-y divide-line/60">
+              {wallet.recentEarnings.map((e: any) => (
+                <div key={e.id} className="flex flex-wrap items-center justify-between gap-4 py-3.5 text-sm">
+                  <div>
+                    <span className="font-semibold text-ink">{e.order?.title || `طلب #${e.order?.orderNo || e.orderId}`}</span>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-ink-muted">
+                      <span>إجمالي الدفعة: {formatMoney(e.grossAmount)}</span>
+                      <span>·</span>
+                      <span>عمولة المنصة ({Math.round(e.commissionRate * 100)}%): {formatMoney(e.commissionAmount)}</span>
+                      <span>·</span>
+                      <span>{formatDateTime(e.createdAt)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-ink-muted">صافي المستحق</p>
+                    <span className="font-mono text-base font-bold text-teal">{formatMoney(e.netAmount)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Tab 3: Payout Methods */}
+      {activeTab === 'methods' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setShowMethodModal(true)}>
+              + إضافة حساب بنكي جديد
+            </Button>
           </div>
-        )}
-      </Card>
+          {loading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : !wallet?.payoutMethods?.length ? (
+            <EmptyState compact title="لم تقم بإضافة حسابات بنكية" hint="أضف آيبان حسابك البنكي لتتمكن من استلام أرباحك بسلاسة" />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {wallet.payoutMethods.map((pm: any) => (
+                <Card key={pm.id} className="p-4 relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-ink">{pm.bankName}</span>
+                    {pm.isDefault && <Badge tone="teal">الحساب الأساسي</Badge>}
+                  </div>
+                  <p className="text-xs text-ink-muted">اسم صاحب الحساب: <span className="text-ink font-medium">{pm.accountHolderName}</span></p>
+                  <p className="mt-1 font-mono text-sm text-gold-300" dir="ltr">{pm.ibanMasked}</p>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Withdraw Modal */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
+              <h3 className="text-lg font-bold">طلب سحب أرباح</h3>
+              <button onClick={() => setShowWithdrawModal(false)} className="text-ink-muted hover:text-ink text-sm font-bold">✕</button>
+            </div>
+            <Form onSubmit={handleWithdrawSubmit} className="space-y-4">
+              <div className="rounded-md border border-teal-500/20 bg-teal-500/10 p-3 text-xs text-teal">
+                الرصيد المتاح للسحب الآن: <b className="font-mono font-bold">{formatMoney(wallet?.availableBalance ?? 0)}</b>
+              </div>
+
+              <Field label="اختر الحساب البنكي للتحويل">
+                <select
+                  value={selectedMethodId}
+                  onChange={(e) => setSelectedMethodId(e.target.value)}
+                  className="w-full rounded-md border border-line bg-elevated px-3 py-2 text-sm text-ink focus:border-gold-400 focus:outline-none"
+                  required
+                >
+                  {wallet?.payoutMethods?.map((m: any) => (
+                    <option key={m.id} value={m.id}>
+                      {m.bankName} ({m.ibanMasked}) {m.isDefault ? '— افتراضي' : ''}
+                    </option>
+                  ))}
+                </select>
+                {(!wallet?.payoutMethods || wallet.payoutMethods.length === 0) && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowWithdrawModal(false); setShowMethodModal(true); }}
+                    className="mt-1 text-xs text-gold-300 underline"
+                  >
+                    + أضف حساباً بنكياً أولاً
+                  </button>
+                )}
+              </Field>
+
+              <Field label="مبلغ السحب (ريال سعودي)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="50"
+                  max={wallet?.availableBalance}
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="الحد الأدنى 50 ريال"
+                  required
+                />
+              </Field>
+
+              <Field label="ملاحظات للإدارة المالية (اختياري)">
+                <textarea
+                  value={withdrawNotes}
+                  onChange={(e) => setWithdrawNotes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-md border border-line bg-elevated px-3 py-2 text-sm text-ink focus:border-gold-400 focus:outline-none"
+                  placeholder="أي تفاصيل خاصة بالحوالة..."
+                />
+              </Field>
+
+              <div className="flex items-center justify-end gap-3 pt-3">
+                <Button type="button" variant="subtle" onClick={() => setShowWithdrawModal(false)}>
+                  إلغاء
+                </Button>
+                <Button type="submit" loading={submittingWithdraw}>
+                  تأكيد وحجز المبلغ للسحب
+                </Button>
+              </div>
+            </Form>
+          </Card>
+        </div>
+      )}
+
+      {/* Add Payout Method Modal */}
+      {showMethodModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
+              <h3 className="text-lg font-bold">إضافة حساب بنكي معتمد</h3>
+              <button onClick={() => setShowMethodModal(false)} className="text-ink-muted hover:text-ink text-sm font-bold">✕</button>
+            </div>
+            <Form onSubmit={handleMethodSubmit} className="space-y-4">
+              <Field label="اسم البنك">
+                <Input
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="مثل: مصرف الراجحي، بنك الرياض، البنك الأهلي"
+                  required
+                />
+              </Field>
+
+              <Field label="اسم صاحب الحساب">
+                <Input
+                  value={accountHolderName}
+                  onChange={(e) => setAccountHolderName(e.target.value)}
+                  placeholder="الاسم الرباعي الرسمي كما هو مسجل في البنك"
+                  required
+                />
+              </Field>
+
+              <Field label="رقم الآيبان (IBAN)">
+                <Input
+                  dir="ltr"
+                  value={iban}
+                  onChange={(e) => setIban(e.target.value)}
+                  placeholder="SA0000000000000000000000"
+                  required
+                />
+                <p className="mt-1 text-[11px] text-ink-muted">
+                  🔒 يتم تشفير الآيبان بالكامل بأعلى معايير الأمان AES-256 ولن يظهر رقمه الكامل في الواجهة.
+                </p>
+              </Field>
+
+              <label className="flex items-center gap-2 text-xs text-ink cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={isDefaultMethod}
+                  onChange={(e) => setIsDefaultMethod(e.target.checked)}
+                  className="rounded border-line"
+                />
+                تعيين كحساب افتراضي لعمليات السحب المستقبلية
+              </label>
+
+              <div className="flex items-center justify-end gap-3 pt-3">
+                <Button type="button" variant="subtle" onClick={() => setShowMethodModal(false)}>
+                  إلغاء
+                </Button>
+                <Button type="submit" loading={submittingMethod}>
+                  حفظ الحساب البنكي
+                </Button>
+              </div>
+            </Form>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,6 +32,9 @@ import AccountProfile from './pages/account/Profile';
 import AccountSettings from './pages/account/Settings';
 import AdminAudit from './pages/dashboard/admin/AdminAudit';
 import AdminSecurity from './pages/dashboard/admin/AdminSecurity';
+import AdminRefunds from './pages/dashboard/admin/AdminRefunds';
+import AdminWithdrawals from './pages/dashboard/admin/AdminWithdrawals';
+import StudentRefunds from './pages/dashboard/student/StudentRefunds';
 import About from './pages/public/About';
 import Faq from './pages/public/Faq';
 import PrivacyPolicy from './pages/public/PrivacyPolicy';
@@ -188,6 +191,7 @@ export default function App() {
               <Route index element={<DashboardHome />} />
               <Route path="orders" element={<Orders />} />
               <Route path="orders/:id" element={<OrderDetail />} />
+              <Route path="refunds" element={<StudentRefunds />} />
               <Route path="courses" element={<MyCourses />} />
               <Route path="requests" element={<MyRequests />} />
               <Route path="custom-requests" element={<StudentCustomRequests />} />
@@ -240,6 +244,8 @@ export default function App() {
               <Route path="custom-requests" element={<AdminCustomRequests />} />
               <Route path="payments" element={<AdminPayments />} />
               <Route path="orders" element={<AdminOrders />} />
+              <Route path="refunds" element={<AdminRefunds />} />
+              <Route path="withdrawals" element={<AdminWithdrawals />} />
               <Route path="ads" element={<AdminAds />} />
               <Route path="notifications" element={<AdminBroadcast />} />
               <Route path="settings" element={<AdminSettings />} />

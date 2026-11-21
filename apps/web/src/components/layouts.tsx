@@ -59,6 +59,7 @@ const NAVS: Record<Role, NavItem[]> = {
   STUDENT: [
     { to: '/dashboard', labelKey: 'dash.overview', icon: IconDashboard },
     { to: '/dashboard/orders', labelKey: 'dash.orders', icon: IconOrders },
+    { to: '/dashboard/refunds', labelKey: 'dash.refunds', icon: IconWallet },
     { to: '/dashboard/courses', labelKey: 'dash.myCourses', icon: IconCourses },
     { to: '/dashboard/requests', labelKey: 'dash.requests', icon: IconRequests },
     { to: '/dashboard/custom-requests', labelKey: 'dash.customRequests', icon: IconCustomRequests },
@@ -93,6 +94,8 @@ const NAVS: Record<Role, NavItem[]> = {
     { to: '/admin/custom-requests', labelKey: 'dash.customServices', icon: IconCustomRequests },
     { to: '/admin/payments', labelKey: 'dash.paymentReceipts', icon: IconPayments },
     { to: '/admin/orders', labelKey: 'dash.financialOrders', icon: IconOrders },
+    { to: '/admin/refunds', labelKey: 'dash.adminRefunds', icon: IconWallet },
+    { to: '/admin/withdrawals', labelKey: 'dash.adminWithdrawals', icon: IconPayments },
     { to: '/admin/ads', labelKey: 'dash.adsModeration', icon: IconMegaphone },
     { to: '/admin/notifications', labelKey: 'dash.broadcast', icon: IconBroadcast },
     { to: '/admin/settings', labelKey: 'dash.platformSettings', icon: IconSettings },
