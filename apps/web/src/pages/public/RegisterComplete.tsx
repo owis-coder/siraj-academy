@@ -176,11 +176,11 @@ export default function RegisterComplete() {
         /* تجاهل */
       }
 
+      await refresh();
       if (role === 'teacher') {
         toast.push('success', t('register.successTeacher'));
-        nav('/login', { replace: true });
+        nav('/teacher/profile', { replace: true });
       } else {
-        await refresh();
         toast.push('success', t('register.successStudent') || 'تم استكمال التسجيل بنجاح!');
         nav('/dashboard', { replace: true });
       }

@@ -78,7 +78,7 @@ export default function Login() {
     } else if (user?.role === 'ADMIN') {
       nav('/admin', { replace: true });
     } else if (user?.role === 'TEACHER') {
-      nav('/teacher', { replace: true });
+      nav('/teacher/profile', { replace: true });
     } else {
       nav('/dashboard', { replace: true });
     }

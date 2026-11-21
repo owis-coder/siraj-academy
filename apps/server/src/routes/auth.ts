@@ -591,7 +591,7 @@ router.post(
             passwordHash: await hashPassword(data.password),
             whatsapp: data.whatsapp ?? null,
             role: isTeacher ? Role.TEACHER : Role.STUDENT,
-            status: isTeacher ? "PENDING" : "ACTIVE",
+            status: "ACTIVE",
             emailVerified: true, // موثق رسميًا من Google
             emailVerifiedAt: new Date(),
             universityId: data.universityId || null,
@@ -649,22 +649,17 @@ router.post(
         link: "/admin/teachers?status=PENDING",
         type: "TEACHER_PENDING",
       });
-
-      return res.status(201).json({
-        data: {
-          user: sanitizeUser(user),
-          message: "تم إنشاء حساب المدرس بنجاح عبر Google، وسيتم تفعيله بعد مراجعة الإدارة.",
-        },
-      });
     }
 
-    // الطالب: نسجل دخوله فورًا
-    await startSession(req, res, user);
+    const session = await startSession(req, res, user);
 
     return res.status(201).json({
       data: {
         user: sanitizeUser(user),
-        message: "تم إنشاء حسابك وتوثيقه بنجاح عبر Google.",
+        session: { id: session.id },
+        message: isTeacher
+          ? "تم إنشاء حساب المدرس بنجاح عبر Google، وسيتم تفعيله بعد مراجعة الإدارة."
+          : "تم إنشاء حسابك وتوثيقه بنجاح عبر Google.",
       },
     });
   }),

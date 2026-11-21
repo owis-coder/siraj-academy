@@ -28,7 +28,14 @@ export default function RegisterChoice() {
       if (data.status === 'LOGGED_IN') {
         await refresh();
         toast.push('success', t('login.success') || 'تم تسجيل الدخول بنجاح');
-        nav('/dashboard', { replace: true });
+        const userRole = data.user?.role;
+        if (userRole === 'TEACHER') {
+          nav('/teacher/profile', { replace: true });
+        } else if (userRole === 'ADMIN') {
+          nav('/admin', { replace: true });
+        } else {
+          nav('/dashboard', { replace: true });
+        }
         return;
       }
 
