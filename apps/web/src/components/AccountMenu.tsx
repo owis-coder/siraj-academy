@@ -202,8 +202,8 @@ export function AccountMenu() {
           <div className="relative">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="grid size-7 place-items-center rounded-lg bg-gold-500/20 text-sm text-gold-300">
-                  ⚙️
+                <span className="grid size-7 place-items-center rounded-lg bg-gold-500/20 text-gold-300">
+                  <IconSettings className="size-4" />
                 </span>
                 <span className="font-bold text-sm text-gold-200">
                   إعدادات حسابك ولوحة التحكم
