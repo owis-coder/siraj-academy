@@ -5,7 +5,7 @@ import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
 import { PublicLayout, StudentLayout, TeacherLayout, AdminLayout } from './components/layouts';
-import { ProtectedRoute, RoleRoute } from './components/guards';
+import { ProtectedRoute, RoleRoute, GuestRoute } from './components/guards';
 
 import Home from './pages/public/Home';
 import Universities from './pages/public/Universities';
@@ -131,14 +131,14 @@ export default function App() {
               <Route path="requests/:id" element={<RequestDetail />} />
               <Route path="teachers" element={<Teachers />} />
               <Route path="teachers/:username" element={<TeacherProfilePage />} />
-              <Route path="login" element={<Login />} />
-              <Route path="register" element={<RegisterChoice />} />
-              <Route path="register/form" element={<Register />} />
-              <Route path="register/email" element={<Register />} />
-              <Route path="register/complete" element={<RegisterComplete />} />
+              <Route path="login" element={<GuestRoute><Login /></GuestRoute>} />
+              <Route path="register" element={<GuestRoute><RegisterChoice /></GuestRoute>} />
+              <Route path="register/form" element={<GuestRoute><Register /></GuestRoute>} />
+              <Route path="register/email" element={<GuestRoute><Register /></GuestRoute>} />
+              <Route path="register/complete" element={<GuestRoute><RegisterComplete /></GuestRoute>} />
               <Route path="verify-email" element={<VerifyEmail />} />
-              <Route path="forgot-password" element={<ForgotPassword />} />
-              <Route path="reset-password" element={<ResetPassword />} />
+              <Route path="forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+              <Route path="reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
               <Route path="confirm-email-change" element={<ConfirmEmailChange />} />
 
               {/* ===== الحساب مدمج في الموقع (طالب/مدرّس/إدارة) ===== */}

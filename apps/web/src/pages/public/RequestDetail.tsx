@@ -230,8 +230,16 @@ export default function RequestDetail() {
               <p className="font-semibold text-ink-primary">{t('requestDetail.teacherCta')}</p>
               <p className="mt-2 leading-7">{t('requestDetail.teacherCtaBody')}</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link to="/login"><Button size="sm" variant="outline">{t('common.login')}</Button></Link>
-                <Link to="/register?tab=teacher"><Button size="sm" variant="subtle">{t('teachers.join')}</Button></Link>
+                {!user ? (
+                  <>
+                    <Link to="/login" state={{ from: `/requests/${r.id}` }}><Button size="sm" variant="outline">{t('common.login')}</Button></Link>
+                    <Link to="/register?tab=teacher"><Button size="sm" variant="subtle">{t('teachers.join')}</Button></Link>
+                  </>
+                ) : user.role === 'TEACHER' ? (
+                  <Link to="/teacher/profile"><Button size="sm" variant="outline">إكمال التوثيق لتقديم عرض</Button></Link>
+                ) : (
+                  <span className="text-xs text-ink-muted">هذا الطلب مخصص لعروض الأساتذة المعتمدين فقط</span>
+                )}
               </div>
             </Card>
           ) : (

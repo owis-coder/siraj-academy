@@ -26,8 +26,15 @@ export default function RegisterComplete() {
   const nav = useNavigate();
   const loc = useLocation();
   const toast = useToast();
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
   const { t } = useI18n();
+
+  useEffect(() => {
+    if (user) {
+      const dest = user.role === 'ADMIN' ? '/admin' : user.role === 'TEACHER' ? '/teacher' : '/dashboard';
+      nav(dest, { replace: true });
+    }
+  }, [user, nav]);
 
   // استرجاع بيانات تذكرة OAuth من الـ state أو sessionStorage
   const [oauthData, setOauthData] = useState<OAuthState | null>(() => {

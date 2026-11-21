@@ -152,10 +152,14 @@ export default function CourseDetail() {
                           : t('courseDetail.trial')}
                       </Badge>
                       {locked ? (
-                        user?.role === 'STUDENT' ? (
-                          <Button size="sm" variant="outline" onClick={() => { const o = lessonOffering.get(l.id); if (o) enroll(o); }}>{t('courseDetail.subscribeToOpen')}</Button>
+                        user ? (
+                          user.role === 'STUDENT' ? (
+                            <Button size="sm" variant="outline" onClick={() => { const o = lessonOffering.get(l.id); if (o) enroll(o); }}>{t('courseDetail.subscribeToOpen')}</Button>
+                          ) : (
+                            <span className="text-xs text-ink-muted">محتوى مخصص للطلاب المشتركين</span>
+                          )
                         ) : (
-                          <Link to="/register" className="text-xs text-gold-300 hover:text-gold-200">{t('courseDetail.registerToAccess')}</Link>
+                          <Link to="/login" state={{ from: `/courses/${id}` }} className="text-xs text-gold-300 hover:text-gold-200">{t('courseDetail.registerToAccess')}</Link>
                         )
                       ) : (
                         <button className="text-xs text-teal hover:underline" onClick={() => embed && setPlaying({ embed, title: l.title })} disabled={!embed}>

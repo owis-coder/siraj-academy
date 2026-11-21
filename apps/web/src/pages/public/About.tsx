@@ -3,6 +3,7 @@ import { Button } from '../../components/ui';
 import { FAQ } from './Faq';
 import { useI18n } from '../../i18n';
 import { useTheme } from '../../lib/theme';
+import { useAuth } from '../../lib/auth';
 
 export default function About() {
   const { t } = useI18n();
@@ -61,9 +62,27 @@ export default function About() {
 
 export function AboutCta() {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const dest = !user
+    ? '/register'
+    : user.role === 'ADMIN'
+      ? '/admin'
+      : user.role === 'TEACHER'
+        ? '/teacher'
+        : '/dashboard';
   return (
     <div className="container-x pb-10 text-center">
-      <Link to="/register"><Button>{t('about.createAccount')}</Button></Link>
+      <Link to={dest}>
+        <Button>
+          {user
+            ? user.role === 'ADMIN'
+              ? 'لوحة الإدارة'
+              : user.role === 'TEACHER'
+                ? 'لوحة المدرّس'
+                : 'لوحة التحكم'
+            : t('about.createAccount')}
+        </Button>
+      </Link>
     </div>
   );
 }

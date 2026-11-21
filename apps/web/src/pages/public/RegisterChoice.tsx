@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -11,10 +11,17 @@ export default function RegisterChoice() {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const toast = useToast();
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const dest = user.role === 'ADMIN' ? '/admin' : user.role === 'TEACHER' ? '/teacher' : '/dashboard';
+      nav(dest, { replace: true });
+    }
+  }, [user, nav]);
 
   const teacherParam = params.get('tab') === 'teacher' ? '?tab=teacher' : '';
 

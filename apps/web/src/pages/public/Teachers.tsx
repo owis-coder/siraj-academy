@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api, type University, type User, type TeacherProfile } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { Input, Select, SkeletonGrid, EmptyState, Pagination, Button, AnimatedCounter } from '../../components/ui';
 import { TeacherCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
@@ -10,6 +11,7 @@ type Row = User & { teacherProfile?: TeacherProfile | null };
 
 export default function Teachers() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const university = params.get('university') ?? '';
@@ -48,7 +50,15 @@ export default function Teachers() {
       <PageHeader
         title={t('teachers.title')}
         subtitle={t('teachers.subtitle')}
-        action={<Link to="/register?tab=teacher"><Button variant="outline">{t('teachers.join')}</Button></Link>}
+        action={
+          user?.role === 'TEACHER' ? (
+            <Link to="/teacher"><Button variant="outline">لوحة المدرّس</Button></Link>
+          ) : user?.role === 'ADMIN' ? (
+            <Link to="/admin"><Button variant="outline">لوحة الإدارة</Button></Link>
+          ) : !user ? (
+            <Link to="/register?tab=teacher"><Button variant="outline">{t('teachers.join')}</Button></Link>
+          ) : null
+        }
       />
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <Input placeholder={t('teachers.searchPlaceholder')} defaultValue={q} onChange={(e) => upd({ q: e.target.value })} />

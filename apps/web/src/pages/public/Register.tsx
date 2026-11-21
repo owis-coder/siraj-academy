@@ -26,10 +26,17 @@ type UsernameStatus = 'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 
 export default function Register() {
   const nav = useNavigate();
   const toast = useToast();
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
   const { t } = useI18n();
   const [params] = useSearchParams();
   const [tab, setTab] = useState(params.get('tab') === 'teacher' ? 'teacher' : 'student');
+
+  useEffect(() => {
+    if (user) {
+      const dest = user.role === 'ADMIN' ? '/admin' : user.role === 'TEACHER' ? '/teacher' : '/dashboard';
+      nav(dest, { replace: true });
+    }
+  }, [user, nav]);
 
   /* الحقول الأساسية المشتركة */
   const [fullName, setFullName] = useState('');

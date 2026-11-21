@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, type User } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
@@ -13,8 +13,18 @@ export default function Login() {
   const nav = useNavigate();
   const loc = useLocation();
   const toast = useToast();
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
   const { t } = useI18n();
+
+  useEffect(() => {
+    if (user) {
+      const from = (loc.state as { from?: string } | null)?.from;
+      const defaultTarget =
+        user.role === 'ADMIN' ? '/admin' : user.role === 'TEACHER' ? '/teacher' : '/dashboard';
+      const dest = from && !from.startsWith('/login') && !from.startsWith('/register') ? from : defaultTarget;
+      nav(dest, { replace: true });
+    }
+  }, [user, nav, loc.state]);
   const stateIdentifier = (loc.state as { identifier?: string } | null)?.identifier ?? '';
   const [identifier, setIdentifier] = useState(stateIdentifier);
   const [password, setPassword] = useState('');

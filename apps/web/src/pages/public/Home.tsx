@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState, type ComponentType } from 'react';
 import { api, type University, type Course, type ExplainRequest, type Service } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { Button, Card, Badge, SkeletonGrid, Accordion, StatCard, AnimatedCounter } from '../../components/ui';
 import { UniversityCard, CourseCard, RequestCard, ServiceCard } from '../../components/cards';
 import { useI18n } from '../../i18n';
@@ -23,6 +24,7 @@ const VALUE_KEYS: { icon: ComponentType<{ className?: string }>; n: number }[] =
 
 export default function Home() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [requests, setRequests] = useState<ExplainRequest[]>([]);
@@ -67,7 +69,17 @@ export default function Home() {
               {t('home.heroDesc')}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/register"><Button className="px-7 py-3 text-base">{t('home.ctaStart')}</Button></Link>
+              <Link to={!user ? '/register' : user.role === 'ADMIN' ? '/admin' : user.role === 'TEACHER' ? '/teacher' : '/dashboard'}>
+                <Button className="px-7 py-3 text-base">
+                  {user
+                    ? user.role === 'ADMIN'
+                      ? 'الانتقال للوحة الإدارة'
+                      : user.role === 'TEACHER'
+                        ? 'الانتقال للوحة المدرّس'
+                        : 'الانتقال للوحة التحكم'
+                    : t('home.ctaStart')}
+                </Button>
+              </Link>
               <Link to="/courses"><Button variant="outline" className="px-7 py-3 text-base">{t('home.ctaExplore')}</Button></Link>
             </div>
           </div>
@@ -257,12 +269,39 @@ export default function Home() {
           <div className="hero-pattern absolute inset-0 opacity-70" aria-hidden />
           <div className="relative">
             <h2 className="text-2xl font-bold sm:text-3xl">
-              {t('home.cta.title')} <span className="gold-text">{t('home.cta.highlight')}</span>
+              {user ? (
+                <>
+                  مرحبًا بك مجددًا،{' '}
+                  <span className="gold-text">{user.fullName?.split(' ')[0] ?? 'سراج'}</span>
+                </>
+              ) : (
+                <>
+                  {t('home.cta.title')} <span className="gold-text">{t('home.cta.highlight')}</span>
+                </>
+              )}
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-sm text-ink-secondary">{t('home.cta.desc')}</p>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-ink-secondary">
+              {user
+                ? 'لوحة التحكم بانتظارك لمتابعة كافة مقرراتك وشروحاتك وطلباتك الدراسية بكل سهولة.'
+                : t('home.cta.desc')}
+            </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link to="/register"><Button className="px-8">{t('home.cta.register')}</Button></Link>
-              <Link to="/requests/new"><Button variant="outline">{t('home.cta.requestPrivate')}</Button></Link>
+              <Link to={!user ? '/register' : user.role === 'ADMIN' ? '/admin' : user.role === 'TEACHER' ? '/teacher' : '/dashboard'}>
+                <Button className="px-8">
+                  {user
+                    ? user.role === 'ADMIN'
+                      ? 'لوحة الإدارة'
+                      : user.role === 'TEACHER'
+                        ? 'لوحة المدرّس'
+                        : 'لوحة التحكم'
+                    : t('home.cta.register')}
+                </Button>
+              </Link>
+              <Link to={user?.role === 'TEACHER' ? '/teacher/requests' : '/requests/new'}>
+                <Button variant="outline">
+                  {user?.role === 'TEACHER' ? 'تصفح طلبات الشرح' : t('home.cta.requestPrivate')}
+                </Button>
+              </Link>
             </div>
           </div>
         </Card>
