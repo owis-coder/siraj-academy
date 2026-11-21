@@ -67,7 +67,7 @@ export const recaptchaService = {
     // وسم الرمز كمستخدم لمدة دقيقتين
     await securityCache.set(replayKey, "1", 120);
 
-    if (trimmed.startsWith("test_captcha_valid_")) {
+    if (trimmed.startsWith("test_captcha_valid_") || trimmed.startsWith("simulated_token_")) {
       if (isProduction) {
         return { success: false, error: "رموز المحاكاة والاختبار محظورة تمامًا في بيئة الإنتاج.", reasons: ["MOCK_FORBIDDEN_IN_PROD"] };
       }

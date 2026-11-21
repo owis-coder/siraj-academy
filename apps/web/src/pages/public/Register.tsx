@@ -137,7 +137,8 @@ export default function Register() {
       }, captchaToken);
       await refresh();
       toast.push('success', t('register.successStudent'));
-      nav('/dashboard');
+      sessionStorage.setItem('siraj_account_hint', 'pending');
+      nav('/', { replace: true, state: { showAccountHint: true } });
     } catch (err) {
       recaptchaRef.current?.reset();
       setCaptchaToken(null);
@@ -173,7 +174,8 @@ export default function Register() {
       }, captchaToken);
       await refresh();
       toast.push('success', t('register.successTeacher'));
-      nav('/teacher/profile');
+      sessionStorage.setItem('siraj_account_hint', 'pending');
+      nav('/', { replace: true, state: { showAccountHint: true } });
     } catch (err) {
       recaptchaRef.current?.reset();
       setCaptchaToken(null);

@@ -179,11 +179,11 @@ export default function RegisterComplete() {
       await refresh();
       if (role === 'teacher') {
         toast.push('success', t('register.successTeacher'));
-        nav('/teacher/profile', { replace: true });
       } else {
         toast.push('success', t('register.successStudent') || 'تم استكمال التسجيل بنجاح!');
-        nav('/dashboard', { replace: true });
       }
+      sessionStorage.setItem('siraj_account_hint', 'pending');
+      nav('/', { replace: true, state: { showAccountHint: true } });
     } catch (err) {
       setErrs([err instanceof Error ? err.message : t('register.failed')]);
     } finally {

@@ -72,16 +72,9 @@ export default function Login() {
 
   const from = (loc.state as { from?: string } | null)?.from ?? null;
 
-  const navigateAfterLogin = (user?: User | null) => {
-    if (from) {
-      nav(from, { replace: true });
-    } else if (user?.role === 'ADMIN') {
-      nav('/admin', { replace: true });
-    } else if (user?.role === 'TEACHER') {
-      nav('/teacher/profile', { replace: true });
-    } else {
-      nav('/dashboard', { replace: true });
-    }
+  const navigateAfterLogin = (_user?: User | null) => {
+    sessionStorage.setItem('siraj_account_hint', 'pending');
+    nav('/', { replace: true, state: { showAccountHint: true } });
   };
 
   const submit = async () => {

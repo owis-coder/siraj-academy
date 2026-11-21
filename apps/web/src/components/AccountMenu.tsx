@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
 import { Badge } from './ui';
@@ -118,17 +118,36 @@ export function AccountMenu() {
   const { user, logout } = useAuth();
   const { t } = useI18n();
   const nav = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    // إظهار تلميح القائمة المنسدلة عند التحويل للشاشة الرئيسية بعد الدخول أو التسجيل
+    const pendingSession = sessionStorage.getItem('siraj_account_hint') === 'pending';
+    const pendingState = (location.state as { showAccountHint?: boolean } | null)?.showAccountHint;
+
+    if (pendingSession || pendingState) {
+      sessionStorage.removeItem('siraj_account_hint');
+      setShowHint(true);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (!open && !showHint) return;
     const onDown = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setShowHint(false);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setShowHint(false);
+      }
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -136,7 +155,7 @@ export function AccountMenu() {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, showHint]);
 
   if (!user) return null;
 
@@ -147,11 +166,16 @@ export function AccountMenu() {
     <div ref={boxRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setShowHint(false);
+          setOpen((v) => !v);
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t('account.menu')}
-        className="flex items-center gap-2 rounded-full border border-line bg-surface/80 py-1 pe-2 ps-1 text-sm transition-colors hover:border-line-gold hover:bg-elevated focus:outline-none focus:ring-2 focus:ring-gold-300/40"
+        className={`flex items-center gap-2 rounded-full border py-1 pe-2 ps-1 text-sm transition-all hover:border-line-gold hover:bg-elevated focus:outline-none focus:ring-2 focus:ring-gold-300/40 ${
+          showHint ? 'border-gold-400 bg-gold-500/10 shadow-glow' : 'border-line bg-surface/80'
+        }`}
       >
         <UserAvatar size={30} />
         <span className="hidden max-w-28 truncate font-semibold text-ink-primary sm:block">{user.fullName}</span>
@@ -160,6 +184,66 @@ export function AccountMenu() {
           className={`hidden size-3.5 text-ink-muted transition-transform sm:block ${open ? 'rotate-180' : ''}`}
         />
       </button>
+
+      {/* المربع المنبثق التوضيحي بالقرب من القائمة المنسدلة */}
+      {showHint && !open && (
+        <div
+          role="dialog"
+          aria-label="تلميح إعدادات الحساب"
+          className="absolute end-0 top-full z-[70] mt-3 w-72 sm:w-80 rounded-2xl border border-line-gold/90 bg-surface/95 p-4 text-start shadow-glow backdrop-blur-md animate-fadeUp"
+        >
+          {/* سهم مؤشر يشير للأعلى إلى زر القائمة */}
+          <div
+            aria-hidden
+            className="absolute -top-1.5 end-6 size-3 rotate-45 border-s border-t border-line-gold/90 bg-surface"
+          />
+
+          <div className="relative">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="grid size-7 place-items-center rounded-lg bg-gold-500/20 text-sm text-gold-300">
+                  ⚙️
+                </span>
+                <span className="font-bold text-sm text-gold-200">
+                  إعدادات حسابك ولوحة التحكم
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHint(false)}
+                className="grid size-6 place-items-center rounded-md text-ink-muted hover:bg-elevated hover:text-ink-primary"
+                title="إغلاق"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mt-2.5 text-xs leading-5 text-ink-secondary">
+              إذا أردت المزيد من <b>الإعدادات</b>، أو الانتقال إلى <b>لوحة التحكم</b>، أو <b>الملف الشخصي</b> و<b>المحادثات</b>، اضغط هنا على اسم حسابك في أي وقت.
+            </p>
+
+            <div className="mt-3 flex items-center justify-end gap-2 border-t border-line/50 pt-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowHint(false);
+                  setOpen(true);
+                }}
+                className="rounded-lg bg-gold-500/20 px-3 py-1.5 text-xs font-semibold text-gold-300 transition-colors hover:bg-gold-500/30"
+              >
+                فتح القائمة الآن
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowHint(false)}
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-elevated hover:text-ink-primary"
+              >
+                حسناً، فهمت
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div
