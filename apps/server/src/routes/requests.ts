@@ -118,44 +118,34 @@ router.get(
     };
     const user = req.user;
 
-    if (mine && !user) {
-      throw unauthorized("الوصول يتطلب تسجيل الدخول");
+    // حماية الخصوصية وقواعد الرؤية:
+    // - زائر غير مسجل: لا تُعرض له أي طلبات شرح طلاب لحماية خصوصية بياناتهم الدراسية
+    // - الطالب: يرى طلباته الشخصية فقط دون دمجها مع طلبات أي طلاب آخرين
+    // - المعلم: يرى الطلبات المفتوحة للشرح لتقديم العروض عليها + الطلبات التي قدم عليها عرضًا
+    // - الإدارة: ترى كافة الطلبات بكافة حالاتها للمراجعة والاعتماد
+    if (!user) {
+      return res.json({ data: [], meta: pageMeta(0, page, limit) });
     }
 
-    // مرشح الرؤية السريع لكل صفة
-    let visibility: Array<Record<string, unknown>> = [{ status: "OPEN" }];
+    let visibility: Array<Record<string, unknown>> = [];
 
-    if (mine) {
-      if (user?.role === "STUDENT") {
-        // طلبات الطالب الشخصية فقط دون دمجها مع OPEN
-        visibility = [{ studentId: user.id }];
-      } else if (user?.role === "TEACHER") {
-        const myOffers = await prisma.offer.findMany({
-          where: { teacher: { userId: user.id } },
-          select: { requestId: true },
-        });
+    if (user.role === "STUDENT") {
+      // الطالب يرى فقط طلباته هو حصراً، سواء مرر mine أو لم يمررها
+      visibility = [{ studentId: user.id }];
+    } else if (user.role === "TEACHER") {
+      const myOffers = await prisma.offer.findMany({
+        where: { teacher: { userId: user.id } },
+        select: { requestId: true },
+      });
+      if (mine) {
         visibility = [{ id: { in: myOffers.map((o) => o.requestId) } }];
-      } else if (user?.role === "ADMIN") {
-        visibility = [{ status: "PENDING_REVIEW" }, { status: "OPEN" }, { status: "TEACHER_SELECTED" }, { status: "CLOSED" }, { status: "REJECTED" }];
-      }
-    } else {
-      if (user?.role === "ADMIN") {
-        // الإدارة يمكنها رؤية جميع الطلبات
-        visibility = [{ status: "PENDING_REVIEW" }, { status: "OPEN" }, { status: "TEACHER_SELECTED" }, { status: "CLOSED" }, { status: "REJECTED" }];
-      } else if (user?.role === "STUDENT") {
-        visibility = [{ studentId: user.id }, { status: "OPEN" }];
-      } else if (user?.role === "TEACHER") {
-        const myOffers = await prisma.offer.findMany({
-          where: { teacher: { userId: user.id } },
-          select: { requestId: true },
-        });
-        visibility = [{ status: "OPEN" }, { id: { in: myOffers.map((o) => o.requestId) } }];
       } else {
-        // زائر غير مسجل: إن طلب حالة غير OPEN لا يُعاد توجيهه بصمت لـ OPEN
-        if (status && status !== "OPEN") {
-          return res.json({ data: [], meta: pageMeta(0, page, limit) });
-        }
+        visibility = [{ status: "OPEN" }, { id: { in: myOffers.map((o) => o.requestId) } }];
       }
+    } else if (user.role === "ADMIN") {
+      visibility = [{ status: "PENDING_REVIEW" }, { status: "OPEN" }, { status: "TEACHER_SELECTED" }, { status: "CLOSED" }, { status: "REJECTED" }];
+    } else {
+      return res.json({ data: [], meta: pageMeta(0, page, limit) });
     }
 
     const where: Record<string, unknown> = {
@@ -248,7 +238,12 @@ router.get(
         : null;
 
     const offersCount = request._count.offers;
-    const canReadFull = isOwner || isAdmin || isApprovedTeacher || !!myOffer;
+
+    // حماية الخصوصية: لا يُكشف طلب الشرح لأي طالب آخر أو زائر خارجي
+    // الرؤية محصورة في: صاحب الطلب نفسه، الإدارة، أو مدرس معتمد / صاحب عرض
+    if (!isOwner && !isAdmin && !isApprovedTeacher && !myOffer) {
+      throw notFound("طلب الشرح غير موجود");
+    }
 
     // غير المنشور لا يُكشف لأحد غير المالك/الإدارة/صاحب العرض — برسالة 404 عامة (بلا تسريب وجود)
     if ((request.status === "PENDING_REVIEW" || request.status === "REJECTED") && !isOwner && !isAdmin && !myOffer) {
@@ -269,25 +264,6 @@ router.get(
         targetId: request.id,
       });
       throw forbidden("هذا الطلب لم يعد متاحًا للعرض — يمكن لصاحب الطلب والإدارة والمدرّس صاحب العرض فقط فتحه");
-    }
-
-    // البيانات المحدودة للزائر/الطالب الآخر على طلب مفتوح
-    if (!canReadFull) {
-      return res.json({
-        data: {
-          id: request.id,
-          courseTitle: request.courseTitle,
-          type: request.type,
-          urgency: request.urgency,
-          status: request.status,
-          createdAt: request.createdAt,
-          university: request.university,
-          college: request.college,
-          major: request.major,
-          offersCount,
-          restricted: true,
-        },
-      });
     }
 
     // العروض الداخلية للمدرسين: للإدارة فقط. صاحب الطلب لا يرى سوى العرض المعتمد.

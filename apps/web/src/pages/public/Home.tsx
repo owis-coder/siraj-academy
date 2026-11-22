@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState, type ComponentType } from 'react';
-import { api, type University, type Course, type ExplainRequest, type Service } from '../../lib/api';
+import { api, type University, type Course, type Service } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { Button, Card, Badge, SkeletonGrid, Accordion, StatCard, AnimatedCounter } from '../../components/ui';
-import { UniversityCard, CourseCard, RequestCard, ServiceCard } from '../../components/cards';
+import { UniversityCard, CourseCard, ServiceCard } from '../../components/cards';
 import { useI18n } from '../../i18n';
 import {
   IconChat,
@@ -27,7 +27,6 @@ export default function Home() {
   const { user } = useAuth();
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [requests, setRequests] = useState<ExplainRequest[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [activeUni, setActiveUni] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,13 +36,11 @@ export default function Home() {
     Promise.allSettled([
       api.universities.list(),
       api.courses.list({ pageSize: 8 }),
-      api.requests.list({ status: 'OPEN', pageSize: 4 }),
       api.services.list(),
-    ]).then(([u, c, r, s]) => {
+    ]).then(([u, c, s]) => {
       if (!alive) return;
       setUniversities(u.status === 'fulfilled' ? u.value.data ?? [] : []);
       setCourses(c.status === 'fulfilled' ? c.value.data ?? [] : []);
-      setRequests(r.status === 'fulfilled' ? r.value.data ?? [] : []);
       setServices(s.status === 'fulfilled' ? s.value.data ?? [] : []);
       setLoading(false);
     });
@@ -91,7 +88,7 @@ export default function Home() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label={t('home.stats.universities')} value={universities.length ? universities.length.toLocaleString() : null} hint={universities.length ? undefined : t('home.stats.noData')} />
           <StatCard label={t('home.stats.courses')} value={courses.length ? courses.length.toLocaleString() : null} hint={courses.length ? undefined : t('home.stats.noData')} />
-          <StatCard label={t('home.stats.requests')} value={requests.length ? requests.length.toLocaleString() : null} hint={requests.length ? undefined : t('home.stats.noRequests')} />
+          <StatCard label={t('home.services.title')} value={services.length ? services.length.toLocaleString() : null} hint={services.length ? undefined : t('home.stats.noData')} />
           <StatCard label={t('home.stats.support')} value="24/7" hint={t('home.stats.supportHint')} />
         </div>
       </section>
@@ -123,41 +120,6 @@ export default function Home() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {universities.slice(0, 6).map((u) => (
               <UniversityCard key={u.id} u={u} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ============ الطلبات الجارية ============ */}
-      <section className="container-x py-10">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-2xl font-bold">{t('home.requests.title')}</h2>
-              {requests.length > 0 && (
-                <span className="inline-flex items-center rounded-full bg-gold-500/10 px-2.5 py-0.5 text-xs font-bold text-gold-300 ring-1 ring-gold-500/20">
-                  <AnimatedCounter value={requests.length} suffix=" طلب" />
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-ink-muted">{t('home.requests.subtitle')}</p>
-          </div>
-          <Link to="/requests" className="inline-flex items-center gap-1.5 text-sm text-gold-300 transition-colors hover:text-gold-200">
-            <span>{t('home.requests.viewAll')}</span>
-            <IconArrowForward className="size-4 shrink-0" />
-          </Link>
-        </div>
-        {loading ? (
-          <SkeletonGrid count={4} />
-        ) : requests.length === 0 ? (
-          <EmptyHint
-            text={t('home.requests.empty')}
-            cta={<Link to="/requests/new"><Button variant="outline" size="sm">{t('home.requests.emptyCta')}</Button></Link>}
-          />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {requests.slice(0, 4).map((r) => (
-              <RequestCard key={r.id} r={r} />
             ))}
           </div>
         )}

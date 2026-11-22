@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { api, type ExplainRequest, type University } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useDebounce } from '../../lib/useDebounce';
@@ -11,6 +11,25 @@ import { useI18n } from '../../i18n';
 export default function Requests() {
   const { t } = useI18n();
   const { user } = useAuth();
+
+  // توجيه الطلبات حسب الصفة حمايةً لخصوصية الطلاب:
+  // - المدرس: يُوجّه إلى لوحة المدرس لاستعراض الطلبات المتاحة للشرح وتقديم العروض
+  // - الإدارة: تُوجّه إلى لوحة الإدارة لمراجعة واعتماد الطلبات
+  // - الطالب: يُوجّه إلى لوحة تحكمه الخاصة لعرض ومتابعة طلباته الشخصية فقط
+  // - الزائر: يُوجّه إلى صفحة إنشاء طلب شرح جديد
+  if (user?.role === 'TEACHER') {
+    return <Navigate to="/teacher/requests" replace />;
+  }
+  if (user?.role === 'ADMIN') {
+    return <Navigate to="/admin/requests" replace />;
+  }
+  if (user?.role === 'STUDENT') {
+    return <Navigate to="/dashboard/requests" replace />;
+  }
+  if (!user) {
+    return <Navigate to="/requests/new" replace />;
+  }
+
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const status = params.get('status') ?? 'OPEN';
