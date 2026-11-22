@@ -339,9 +339,16 @@ export default function RequestNew() {
                   }}
                 />
               ) : (
-                <p className="rounded-md border border-line bg-elevated/40 p-3 text-xs text-ink-muted">
-                  {t('requestNew.loginFirst')}
-                </p>
+                <div className="rounded-lg border border-gold-500/30 bg-gold-500/10 p-4 text-center">
+                  <p className="text-xs text-ink-secondary mb-3">
+                    {t('requestNew.loginFirst')}
+                  </p>
+                  <Link to="/login" state={{ from: '/requests/new' }}>
+                    <Button type="button" size="sm" variant="outline">
+                      {t('common.login')}
+                    </Button>
+                  </Link>
+                </div>
               )}
             </Field>
             <div className="rounded-lg border border-line-gold bg-gold-500/5 p-4 text-sm text-ink-secondary">

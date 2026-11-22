@@ -95,7 +95,8 @@ export default function RequestDetail() {
   }
 
   const isOwner = user?.id === r.studentId;
-  const canOffer = user?.role === 'TEACHER' && r.status === 'OPEN' && !r.restricted;
+  const myOffer = (r as any).myOffer;
+  const canOffer = user?.role === 'TEACHER' && r.status === 'OPEN' && !r.restricted && !myOffer && !r.myOfferId;
   // الطالب لا يرى إلا العرض الذي اعتمدته الإدارة — لا عروض منافسة ولا ردود داخلية
   const publishedOffer = r.publishedOffer ?? null;
 
@@ -205,7 +206,18 @@ export default function RequestDetail() {
               </div>
               {!publishedOffer ? (
                 <div className="p-6">
-                  <EmptyState compact title={t('requestDetail.noOffers')} hint={t('requestDetail.noOffersHint')} />
+                  {r.offersCount && r.offersCount > 0 ? (
+                    <div className="rounded-lg border border-gold-500/30 bg-gold-500/10 p-5 text-center">
+                      <p className="font-semibold text-gold-200">
+                        توجد عروض مقدمة ({r.offersCount}) قيد مراجعة الإدارة
+                      </p>
+                      <p className="mt-2 text-xs text-ink-secondary leading-relaxed">
+                        وصلت عروض من الأساتذة على طلبك، وتقوم إدارة المنصة حاليًا بمراجعتها واعتماد العرض الأنسب لك للتأكد من الجودة والاتفاق المالي. سيظهر العرض المعتمد هنا فور اعتماده لتتمكن من قبوله والبدء.
+                      </p>
+                    </div>
+                  ) : (
+                    <EmptyState compact title={t('requestDetail.noOffers')} hint={t('requestDetail.noOffersHint')} />
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-4 px-6 py-4">
@@ -233,7 +245,40 @@ export default function RequestDetail() {
         </div>
 
         <aside className="space-y-4 self-start lg:sticky lg:top-24">
-          {canOffer ? (
+          {myOffer ? (
+            <Card className="p-6 border-gold-500/30 bg-gold-500/10">
+              <h3 className="font-bold text-gold-200 mb-3">عرضك المقدّم</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-ink-muted">السعر المقدّم:</span>
+                  <span className="font-semibold text-ink-primary">{formatMoney(myOffer.price)}</span>
+                </div>
+                {myOffer.timelineDays != null && (
+                  <div className="flex justify-between">
+                    <span className="text-ink-muted">مدة التسليم:</span>
+                    <span className="font-semibold text-ink-primary">{myOffer.timelineDays} يوم</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-line">
+                  <span className="text-ink-muted">حالة العرض:</span>
+                  <Badge tone={myOffer.status === 'APPROVED' || myOffer.status === 'ACCEPTED' ? 'ok' : myOffer.status === 'REJECTED' ? 'danger' : 'warn'}>
+                    {myOffer.status === 'PENDING'
+                      ? 'قيد مراجعة الإدارة'
+                      : myOffer.status === 'APPROVED'
+                        ? 'معتمد ومرسل للطالب'
+                        : myOffer.status === 'ACCEPTED'
+                          ? 'مقبول من الطالب'
+                          : myOffer.status === 'NEEDS_REVISION'
+                            ? 'يحتاج تعديل'
+                            : 'مرفوض'}
+                  </Badge>
+                </div>
+              </div>
+              <p className="mt-4 rounded-md border border-line bg-elevated/40 p-3 text-xs leading-5 text-ink-muted">
+                ℹ️ نظام الوساطة في سراج: تُراجع الإدارة عروض الأساتذة وتعتمد الأنسب لإرساله للطالب. لا يظهر العرض للطالب إلا بعد اعتماد الإدارة له.
+              </p>
+            </Card>
+          ) : canOffer ? (
             <OfferForm submitting={sending} onSubmit={submitOffer} />
           ) : r.restricted ? (
             <Card className="p-6 text-sm text-ink-muted">

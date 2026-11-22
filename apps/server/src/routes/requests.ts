@@ -247,7 +247,7 @@ router.get(
       user?.role === "TEACHER"
         ? await prisma.offer.findFirst({
             where: { requestId: request.id, teacher: { userId: user.id } },
-            select: { id: true },
+            select: { id: true, status: true, price: true, timelineDays: true, createdAt: true },
           })
         : null;
 
@@ -343,6 +343,7 @@ router.get(
         publishedOffer,
         restricted: false,
         myOfferId: myOffer?.id ?? null,
+        myOffer: myOffer ?? null,
       },
     });
   }),

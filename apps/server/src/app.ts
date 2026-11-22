@@ -135,6 +135,7 @@ export function createApp(): express.Express {
   api.use("/ads", adsRouter);
   api.use("/notifications", notificationsRouter);
   api.use("/uploads", uploadsRouter);
+  api.use("/uploads", filesRouter);
   api.use("/files", storageRouter);
   api.use("/admin/storage", storageAdminRouter);
   api.use("/admin/verification", adminVerificationRouter);

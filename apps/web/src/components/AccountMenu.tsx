@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { useToast } from '../lib/toast';
 import { Badge } from './ui';
 import { useI18n } from '../i18n';
+import { resolveAssetUrl } from '../lib/api';
 import {
   IconUser,
   IconSettings,
@@ -93,7 +94,7 @@ export function UserAvatar({ size = 36, className = '' }: { size?: number; class
   if (user?.avatarUrl && !broken) {
     return (
       <img
-        src={user.avatarUrl}
+        src={resolveAssetUrl(user.avatarUrl)}
         alt={t('account.avatarAlt', { name: user.fullName })}
         width={size}
         height={size}

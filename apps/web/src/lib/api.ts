@@ -4,6 +4,24 @@ import en from '../i18n/en.json';
 
 export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api/v1';
 
+/** تحويل مسار أصل نسبي (مثل /uploads/... أو /files/...) إلى رابط كامل مع خادم الواجهة الخلفية */
+export function resolveAssetUrl(url?: string | null): string {
+  if (!url) return '';
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('blob:') ||
+    url.startsWith('data:')
+  ) {
+    return url;
+  }
+  if (API_BASE.startsWith('http://') || API_BASE.startsWith('https://')) {
+    const origin = API_BASE.replace(/\/api\/v1\/?$/, '');
+    return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+  return url;
+}
+
 /** اللغة الحالية — كما يحفظها مزوّد الترجمة */
 function currentLang(): 'ar' | 'en' {
   try {

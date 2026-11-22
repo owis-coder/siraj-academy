@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { api, type CustomRequestType } from '../../lib/api';
+import { api, type CustomRequestType, type StoredFileMeta } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { Button, Card, Form, Field, Input, Textarea, Badge } from '../../components/ui';
 import { PageHeader } from '../../components/PageHeader';
 import { Seo } from '../../lib/seo';
 import { useI18n } from '../../i18n';
-import { IconAttachment, IconFile, IconArrowForward } from '../../components/icons';
+import { IconArrowForward } from '../../components/icons';
+import { MultiFileUploader } from '../../components/MultiFileUploader';
 
 const REQUEST_TYPES: CustomRequestType[] = [
   'COURSE_EXPLAIN',
@@ -48,43 +49,10 @@ export default function CustomRequestNew() {
   const [academicLevel, setAcademicLevel] = useState('');
   const [deadline, setDeadline] = useState('');
   const [budget, setBudget] = useState('');
-  const [attachments, setAttachments] = useState<Array<{ name: string; url: string; size?: number; type?: string }>>([]);
-  const [uploading, setUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<StoredFileMeta[]>([]);
+  const [pendingUploads, setPendingUploads] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    if (file.size > 20 * 1024 * 1024) {
-      toast.push('error', t('customRequest.maxSize'));
-      return;
-    }
-    setUploading(true);
-    try {
-      const res = await api.uploads.create(file);
-      setAttachments((prev) => [
-        ...prev,
-        {
-          name: file.name,
-          url: res.data.url,
-          size: file.size,
-          type: file.type,
-        },
-      ]);
-      toast.push('success', t('customRequest.uploaded'));
-      e.target.value = '';
-    } catch (err) {
-      toast.push('error', err instanceof Error ? err.message : t('customRequest.uploadFailed'));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
 
   const validate = () => {
     const err: Record<string, string> = {};
@@ -113,6 +81,18 @@ export default function CustomRequestNew() {
       toast.push('error', t('customRequest.requiredErr'));
       return;
     }
+    if (pendingUploads > 0) {
+      toast.push('error', 'يُرجى انتظار اكتمال رفع جميع الملفات');
+      return;
+    }
+
+    const fileAttachments = uploadedFiles.map((f) => ({
+      id: f.id,
+      name: f.originalFileName,
+      size: f.fileSize,
+      type: f.mimeType,
+      url: `/files/${f.id}`,
+    }));
 
     setSubmitting(true);
     try {
@@ -125,7 +105,7 @@ export default function CustomRequestNew() {
         academicLevel: academicLevel.trim() || undefined,
         deadline: deadline.trim() || undefined,
         budget: budget ? Number(budget) : undefined,
-        attachments: attachments.length > 0 ? attachments : undefined,
+        attachments: fileAttachments.length > 0 ? fileAttachments : undefined,
       });
 
       toast.push('success', t('customRequest.sent'));
@@ -287,48 +267,16 @@ export default function CustomRequestNew() {
             </Field>
           </div>
 
-          {/* المرفقات */}
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-ink-primary">{t('customRequest.attachLabel')}</label>
-            <p className="mb-3 text-xs text-ink-muted">{t('customRequest.attachHint')}</p>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                  accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.zip"
-                />
-                <Button type="button" variant="outline" size="sm" loading={uploading} className="inline-flex items-center gap-1.5">
-                  <IconAttachment className="size-4" />
-                  <span>{t('customRequest.uploadBtn')}</span>
-                </Button>
-              </label>
-              {uploading && <span className="text-xs text-gold-300">{t('customRequest.uploading')}</span>}
-            </div>
-
-            {attachments.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {attachments.map((att, idx) => (
-                  <li key={idx} className="flex items-center justify-between rounded-md border border-line bg-surface p-2.5 text-xs">
-                    <span className="flex max-w-sm items-center gap-1.5 truncate font-medium text-ink-primary">
-                      <IconFile className="size-3.5 shrink-0 text-gold-300" />
-                      <span className="truncate">{att.name}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(idx)}
-                      className="ms-2 text-danger hover:underline"
-                    >
-                      {t('customRequest.delete')}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {/* المرفقات المباشرة عبر التخزين السحابي الآمن */}
+          <Field label={t('customRequest.attachLabel')} hint={t('customRequest.attachHint')}>
+            <MultiFileUploader
+              category="CUSTOM_REQUESTS"
+              onChange={(files, pending) => {
+                setUploadedFiles(files);
+                setPendingUploads(pending);
+              }}
+            />
+          </Field>
 
           {/* زر الإرسال */}
           <div className="flex items-center justify-between border-t border-line pt-4">

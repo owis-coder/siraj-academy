@@ -23,13 +23,14 @@ const MIME_BY_EXT: Record<string, string> = {
 
 const ROOT = path.resolve(UPLOAD_ROOT);
 
-// صور الكتالوج العامة (شعار جامعة أو غلاف مقرر) مقصودة للعرض للجميع
+// صور الكتالوج العامة والصور الشخصية مقصودة للعرض في المتصفح دون إفشاء بيانات حساسة
 async function isPublicCatalogImage(url: string): Promise<boolean> {
-  const [university, course] = await Promise.all([
+  const [university, course, user] = await Promise.all([
     prisma.university.findFirst({ where: { logoUrl: url }, select: { id: true } }),
     prisma.course.findFirst({ where: { coverUrl: url }, select: { id: true } }),
+    prisma.user.findFirst({ where: { avatarUrl: url }, select: { id: true } }),
   ]);
-  return !!university || !!course;
+  return !!university || !!course || !!user;
 }
 
 async function isApprovedAdImage(url: string): Promise<boolean> {
