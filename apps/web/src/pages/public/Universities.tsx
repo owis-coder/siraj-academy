@@ -4,6 +4,7 @@ import { api, type University } from '../../lib/api';
 import { Pagination, SkeletonGrid, EmptyState, Input, AnimatedCounter } from '../../components/ui';
 import { UniversityCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo, itemListLd } from '../../lib/seo';
 import { useI18n } from '../../i18n';
 
 export default function Universities() {
@@ -26,6 +27,15 @@ export default function Universities() {
 
   return (
     <div className="container-x py-10">
+      <Seo
+        title={t('seo.universities.title')}
+        description={t('seo.universities.desc')}
+        jsonLd={
+          state.items.length > 0
+            ? itemListLd(state.items.slice(0, 50).map((u) => ({ name: u.name, path: `/universities/${u.slug}` })))
+            : undefined
+        }
+      />
       <PageHeader title={t('universities.title')} subtitle={t('universities.subtitle')} />
       <div className="mb-6 max-w-md">
         <Input

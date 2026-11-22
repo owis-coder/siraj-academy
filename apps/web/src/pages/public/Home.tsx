@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { Button, Card, Badge, SkeletonGrid, Accordion, StatCard, AnimatedCounter } from '../../components/ui';
 import { UniversityCard, CourseCard, ServiceCard } from '../../components/cards';
 import { useI18n } from '../../i18n';
+import { Seo } from '../../lib/seo';
 import {
   IconChat,
   IconBank,
@@ -53,6 +54,7 @@ export default function Home() {
 
   return (
     <>
+      <Seo title={t('seo.home.title')} description={t('seo.home.desc')} />
       {/* ============ Hero ============ */}
       <section className="relative overflow-hidden border-b border-line/50">
         <div className="hero-pattern absolute inset-0" aria-hidden />

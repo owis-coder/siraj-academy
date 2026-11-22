@@ -59,7 +59,7 @@ export function ChatThread({ room }: { room: ChatRoom | null }) {
   const isSupport = !isAdminViewer && (room.isSupport || (room.participants ?? []).some((p) => p.role === 'ADMIN' || (p as { username?: string }).username === 'siraj_support'));
 
   return (
-    <div className="flex h-[calc(100vh-190px)] min-h-96 flex-col rounded-lg border border-line bg-surface">
+    <div className="flex h-[calc(100vh-190px)] h-[calc(100dvh-190px)] min-h-0 flex-col rounded-lg border border-line bg-surface sm:min-h-96">
       <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
         <div className="flex items-center gap-3">
           <span

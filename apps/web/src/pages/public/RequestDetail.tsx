@@ -8,6 +8,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { REQUEST_STATUS_LABEL, REQUEST_STATUS_TONE, formatMoney, formatDate, URGENCY_LABEL, EXPLAIN_TYPE_LABEL } from '../../lib/format';
 import { useI18n } from '../../i18n';
 import { IconAttachment } from '../../components/icons';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { Seo } from '../../lib/seo';
 
 type LoadError = { status: number; message: string };
 
@@ -125,6 +127,11 @@ export default function RequestDetail() {
 
   return (
     <div className="container-x py-10">
+      <Seo
+        title={t('seo.requests.title')}
+        description={t('seo.requests.desc')}
+        noindex
+      />
       <PageHeader
         back
         title={t('requestDetail.titlePrefix', { course: r.courseTitle })}
@@ -203,7 +210,10 @@ export default function RequestDetail() {
               ) : (
                 <div className="flex flex-wrap items-center gap-4 px-6 py-4">
                   <div className="min-w-40 flex-1">
-                    <p className="font-semibold text-ink-primary">{publishedOffer.teacherName}</p>
+                    <p className="inline-flex items-center gap-1 font-semibold text-ink-primary">
+                      {publishedOffer.teacherName}
+                      <VerifiedBadge verified={publishedOffer.teacherVerified} />
+                    </p>
                     <p className="mt-1 text-xs text-ink-muted">
                       معتمد من الإدارة · {publishedOffer.timelineDays != null ? t('requestDetail.deliveryDays', { days: publishedOffer.timelineDays }) : '—'}
                     </p>

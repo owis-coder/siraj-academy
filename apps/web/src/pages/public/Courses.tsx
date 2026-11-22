@@ -4,6 +4,7 @@ import { api, type University, type College, type Major, type Course } from '../
 import { Card, Input, Select, Button, SkeletonGrid, EmptyState, Pagination, AnimatedCounter } from '../../components/ui';
 import { CourseCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo, itemListLd } from '../../lib/seo';
 import { useI18n } from '../../i18n';
 import { IconArrowForward } from '../../components/icons';
 import { useDebounce } from '../../lib/useDebounce';
@@ -74,8 +75,16 @@ export default function Courses() {
 
   return (
     <div className="container-x py-10">
-      <PageHeader
-        title={t('courses.title')}
+            <Seo
+        title={t('seo.courses.title')}
+        description={t('seo.courses.desc')}
+        jsonLd={
+          courses.length > 0
+            ? itemListLd(courses.slice(0, 50).map((c) => ({ name: c.title, path: `/courses/${c.id}` })))
+            : undefined
+        }
+      />
+      <PageHeader title={t('courses.title')}
         subtitle={t('courses.subtitle')}
         action={
           <Link to="/requests/custom?type=course">

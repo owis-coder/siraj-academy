@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { Input, Select, SkeletonGrid, EmptyState, Pagination, Button, AnimatedCounter } from '../../components/ui';
 import { TeacherCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo, itemListLd } from '../../lib/seo';
 import { useI18n } from '../../i18n';
 
 type Row = User & { teacherProfile?: TeacherProfile | null };
@@ -47,6 +48,20 @@ export default function Teachers() {
 
   return (
     <div className="container-x py-10">
+      <Seo
+        title={t('seo.teachers.title')}
+        description={t('seo.teachers.desc')}
+        jsonLd={
+          items.length > 0
+            ? itemListLd(
+                items.slice(0, 50).map((row) => ({
+                  name: row.fullName,
+                  path: `/teachers/${row.username}`,
+                })),
+              )
+            : undefined
+        }
+      />
       <PageHeader
         title={t('teachers.title')}
         subtitle={t('teachers.subtitle')}

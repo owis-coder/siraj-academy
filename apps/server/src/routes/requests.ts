@@ -22,7 +22,7 @@ async function getRequestOrThrow(id: string) {
   const request = await prisma.explainRequest.findUnique({
     where: { id },
     include: {
-      student: { select: { id: true, fullName: true, username: true } },
+      student: { select: { id: true, fullName: true, username: true, isVerified: true } },
       university: { select: { name: true, slug: true } },
       _count: { select: { offers: true } },
     },
@@ -72,6 +72,20 @@ router.post(
         status: "PENDING_REVIEW",
       },
     });
+
+    // ربط ملفات Drive المرفوعة مسبقًا بهذا الطلب (ملكية الطالب فقط)
+    const attachmentIds = Array.isArray(data.attachments) ? data.attachments : [];
+    if (attachmentIds.length > 0) {
+      await prisma.storedFile.updateMany({
+        where: {
+          id: { in: attachmentIds },
+          ownerUserId: req.user!.id,
+          uploadStatus: "UPLOADED",
+          relatedEntityId: null,
+        },
+        data: { relatedEntityType: "EXPLAIN_REQUEST", relatedEntityId: request.id },
+      });
+    }
 
     // إشعار الإداريين بطلب جديد بانتظار المراجعة
     await notifyAdmins({
@@ -185,7 +199,7 @@ router.get(
           status: true,
           createdAt: true,
           university: { select: { name: true, slug: true } },
-          student: withDetails ? { select: { fullName: true, username: true } } : false,
+          student: withDetails ? { select: { fullName: true, username: true, isVerified: true } } : false,
           _count: { select: { offers: true } },
         },
         ...skipTake(page, limit),
@@ -214,7 +228,7 @@ router.get(
     const request = await prisma.explainRequest.findUnique({
       where: { id: req.params.id },
       include: {
-        student: { select: { id: true, fullName: true, username: true } },
+        student: { select: { id: true, fullName: true, username: true, isVerified: true } },
         university: { select: { name: true, slug: true } },
         college: { select: { name: true } },
         major: { select: { name: true } },
@@ -272,7 +286,7 @@ router.get(
       offers = await prisma.offer.findMany({
         where: { requestId: request.id },
         include: {
-          teacher: { include: { user: { select: { fullName: true, username: true } } } },
+          teacher: { include: { user: { select: { fullName: true, username: true, isVerified: true } } } },
         },
         orderBy: [{ status: "asc" }, { price: "asc" }],
       });
@@ -283,7 +297,7 @@ router.get(
     if (isOwner || isAdmin) {
       const approved = await prisma.offer.findFirst({
         where: { requestId: request.id, status: { in: ["APPROVED", "ACCEPTED"] } },
-        include: { teacher: { include: { user: { select: { fullName: true, username: true } } } } },
+        include: { teacher: { include: { user: { select: { fullName: true, username: true, isVerified: true } } } } },
         orderBy: { reviewedAt: "desc" },
       });
       if (approved) {
@@ -294,10 +308,28 @@ router.get(
           status: approved.status,
           teacherName: approved.teacher.user.fullName,
           teacherUsername: approved.teacher.user.username,
+          teacherVerified: approved.teacher.user.isVerified,
           approvedByAdmin: true,
         };
       }
     }
+
+    // مرفقات Drive: بيانات وصفية فقط لصاحب الطلب والإدارة (لا روابط ولا معرفات)
+    const attachmentFiles = await prisma.storedFile.findMany({
+      where: {
+        relatedEntityType: "EXPLAIN_REQUEST",
+        relatedEntityId: request.id,
+        uploadStatus: { not: "DELETED" },
+      },
+      select: {
+        id: true,
+        originalFileName: true,
+        mimeType: true,
+        fileSize: true,
+        reviewStatus: true,
+        createdAt: true,
+      },
+    });
 
     const { _count: _c, student, ...flat } = request;
     res.json({
@@ -307,6 +339,7 @@ router.get(
         ...(isAdmin || isOwner ? { student } : {}),
         offersCount,
         offers,
+        ...(isAdmin || isOwner ? { attachmentFiles } : {}),
         publishedOffer,
         restricted: false,
         myOfferId: myOffer?.id ?? null,
@@ -385,7 +418,7 @@ router.get(
     if (!request) throw notFound("طلب الشرح غير موجود");
     const offers = await prisma.offer.findMany({
       where: { requestId: request.id },
-      include: { teacher: { include: { user: { select: { fullName: true, username: true } } } } },
+      include: { teacher: { include: { user: { select: { fullName: true, username: true, isVerified: true } } } } },
       orderBy: [{ status: "asc" }, { price: "asc" }],
     });
     res.json({ data: offers, meta: { total: offers.length } });

@@ -50,9 +50,10 @@ async function canAccess(url: string, name: string, user: AuthUser | undefined):
   const [payment, message, ad, teacherDocs, requestRows] = await Promise.all([
     prisma.payment.findFirst({
       where: { receiptUrl: url },
-      select: { order: { select: { studentId: true, provider: { select: { userId: true } } } } },
+      select: { order: { select: { studentId: true } } },
     }),
-    prisma.message.findFirst({ where: { attachmentUrl: url }, select: { roomId: true } }),
+    // مرفقات المحادثة: المرسل نفسه أو الإدارة فقط — لا يفتحها الطرف الآخر
+    prisma.message.findFirst({ where: { attachmentUrl: url }, select: { roomId: true, senderId: true } }),
     prisma.ad.findFirst({ where: { imageUrl: url }, select: { status: true, teacher: { select: { userId: true } } } }),
     // وثائق تحقق المدرس: خاصة — لصاحب الملف والإدارة فقط
     prisma.teacherProfile.findFirst({ where: { docsUrl: url }, select: { userId: true } }),
@@ -63,18 +64,14 @@ async function canAccess(url: string, name: string, user: AuthUser | undefined):
     `,
   ]);
 
-  // سند الحوالة: صاحب الطلب أو المدرس المستفيد فقط
+  // سند الحوالة: صاحب الطلب فقط (الإدارة مرّت من الأعلى) — لا يطّلع عليه المدرس
   if (payment) {
-    return payment.order.studentId === user.id || payment.order.provider?.userId === user.id;
+    return payment.order.studentId === user.id;
   }
 
-  // مرفق محادثة: مشاركو الغرفة فقط
+  // مرفق محادثة: المرسل أو الإدارة فقط
   if (message) {
-    const participant = await prisma.chatParticipant.findUnique({
-      where: { roomId_userId: { roomId: message.roomId, userId: user.id } },
-      select: { id: true },
-    });
-    return !!participant;
+    return message.senderId === user.id;
   }
 
   // صورة إعلان: الظهور للجميع بعد الاعتماد، وقبل ذلك للمدرس صاحب الإعلان
@@ -85,10 +82,9 @@ async function canAccess(url: string, name: string, user: AuthUser | undefined):
 
   if (await isPublicCatalogImage(url)) return true;
 
-  // مرفقات طلب شرح: صاحب الطلب، أو أي مستخدم مسجل للطلبات غير المحجوبة (المفتوحة والمُختارة)
+  // مرفقات طلب شرح: صاحب الطلب فقط — الإدارة هي الوسيط، والمدرس لا يصل إلى مجلد الطالب
   if (requestRows.length > 0) {
-    const row = requestRows[0];
-    return row.studentId === user.id || (row.status !== "PENDING_REVIEW" && row.status !== "REJECTED");
+    return requestRows[0].studentId === user.id;
   }
 
   return false;

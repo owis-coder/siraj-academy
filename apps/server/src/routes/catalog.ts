@@ -98,7 +98,7 @@ router.get(
           status: "APPROVED",
           offerings: { some: { course: { universityId: uni.id } } },
         },
-        include: { user: { select: { fullName: true, username: true } }, _count: { select: { offerings: true } } },
+        include: { user: { select: { fullName: true, username: true, isVerified: true } }, _count: { select: { offerings: true } } },
       }),
       prisma.courseOffering.aggregate({
         where: { course: { universityId: uni.id }, status: "PUBLISHED" },
@@ -247,7 +247,7 @@ router.get(
       where: { courseId: course.id, status: "PUBLISHED" },
       include: {
         teacher: {
-          include: { user: { select: { fullName: true, username: true } } },
+          include: { user: { select: { fullName: true, username: true, isVerified: true } } },
         },
         lessons: { orderBy: { order: "asc" } },
         _count: { select: { enrollments: true, reviews: true } },
@@ -336,7 +336,7 @@ router.get(
           bio: true,
           specialties: true,
           universitiesText: true,
-          user: { select: { fullName: true, username: true } },
+          user: { select: { fullName: true, username: true, isVerified: true } },
           _count: { select: { offerings: { where: { status: "PUBLISHED" } } } },
         },
         ...skipTake(page, limit),
@@ -431,7 +431,7 @@ router.get(
         basePrice: true,
         durationDays: true,
         isFeatured: true,
-        provider: { select: { user: { select: { fullName: true, username: true } }, degree: true } },
+        provider: { select: { user: { select: { fullName: true, username: true, isVerified: true } }, degree: true } },
       },
     });
     res.json({ data: items, meta: { total: items.length } });
@@ -443,7 +443,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const service = await prisma.service.findUnique({
       where: { slug: req.params.slug },
-      include: { provider: { include: { user: { select: { fullName: true, username: true } } } } },
+      include: { provider: { include: { user: { select: { fullName: true, username: true, isVerified: true } } } } },
     });
     if (!service || !service.isActive) throw notFound("الخدمة غير موجودة");
     res.json({ data: service });
@@ -521,7 +521,7 @@ router.get(
             { specialties: { has: q } },
           ],
         },
-        select: { id: true, degree: true, user: { select: { fullName: true, username: true } } },
+        select: { id: true, degree: true, user: { select: { fullName: true, username: true, isVerified: true } } },
         take: 5,
       }),
       prisma.service.findMany({
@@ -582,7 +582,7 @@ router.get(
             accessType: true,
             status: true,
             course: { select: { id: true, title: true, code: true } },
-            teacher: { select: { user: { select: { username: true, fullName: true } } } },
+            teacher: { select: { user: { select: { username: true, fullName: true, isVerified: true } } } },
             _count: { select: { lessons: true } },
           },
         },

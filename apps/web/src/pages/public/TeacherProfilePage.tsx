@@ -4,8 +4,10 @@ import { api, type User, type TeacherProfile, type Offering, type LiveSession } 
 import { Button, Card, Badge, Skeleton, EmptyState, Tabs } from '../../components/ui';
 import { formatMoney, formatDateTime } from '../../lib/format';
 import { useI18n } from '../../i18n';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { Seo, SITE_URL, breadcrumbLd, truncateMeta } from '../../lib/seo';
 
-type TeacherDetail = User & { teacherProfile?: TeacherProfile | null; offerings?: Offering[]; services?: { id: string; slug: string; title: string }[]; liveSessions?: LiveSession[] };
+type TeacherDetail = User & { isVerified?: boolean; teacherProfile?: TeacherProfile | null; offerings?: Offering[]; services?: { id: string; slug: string; title: string }[]; liveSessions?: LiveSession[] };
 
 type Extras = {
   bio?: string | null;
@@ -29,6 +31,7 @@ export default function TeacherProfilePage() {
   if (err) {
     return (
       <div className="container-x py-16">
+        <Seo title={t('teacherProfile.loadFailed')} description={t('seo.teachers.desc')} noindex />
         <EmptyState
           title={t('teacherProfile.loadFailed')}
           action={<Link to="/teachers"><Button variant="outline">{t('teacherProfile.allTeachers')}</Button></Link>}
@@ -49,8 +52,37 @@ export default function TeacherProfilePage() {
     ? extras.specialties.join(sep)
     : (extras.specialties ?? data.teacherProfile?.specialties ?? '—');
 
+  const specialtyText = Array.isArray(data.teacherProfile?.specialties)
+    ? data.teacherProfile?.specialties.join('، ')
+    : (data.teacherProfile?.specialties as unknown as string) || '';
+
   return (
     <div className="container-x py-10">
+      <Seo
+        title={data.fullName}
+        description={
+          truncateMeta(data.teacherProfile?.bio) ||
+          t('seo.teacher.fallbackDesc', { name: data.fullName })
+        }
+        type="profile"
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Person',
+            name: data.fullName,
+            url: `${SITE_URL}/teachers/${data.username}`,
+            ...(specialtyText ? { knowsAbout: specialtyText.split(/[,،]/).map((s) => s.trim()).filter(Boolean) } : {}),
+            ...(data.teacherProfile?.degree ? { jobTitle: data.teacherProfile.degree } : {}),
+            worksFor: { '@type': 'EducationalOrganization', name: 'أكاديمية سراج التعليمية', sameAs: SITE_URL },
+            ...(data.isVerified ? { hasCredential: 'Verified by Siraj Academy' } : {}),
+          },
+          breadcrumbLd([
+            { name: 'الرئيسية', path: '/' },
+            { name: 'المدرسون', path: '/teachers' },
+            { name: data.fullName, path: `/teachers/${data.username}` },
+          ]),
+        ]}
+      />
       <Card className="relative mb-8 overflow-hidden p-8">
         <div className="hero-pattern absolute inset-0 opacity-60" aria-hidden />
         <div className="relative flex flex-wrap items-center gap-5">
@@ -58,7 +90,10 @@ export default function TeacherProfilePage() {
             {data.fullName.charAt(0)}
           </span>
           <div>
-            <h1 className="text-3xl font-bold">{data.fullName}</h1>
+            <h1 className="inline-flex items-center gap-2 text-3xl font-bold">
+              {data.fullName}
+              <VerifiedBadge verified={(data as unknown as { isVerified?: boolean }).isVerified} size="md" />
+            </h1>
             <p className="mt-1 text-sm text-ink-muted" dir="ltr">@{data.username}</p>
           </div>
           <div className="ms-auto">

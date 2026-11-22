@@ -74,12 +74,24 @@
 
 html {
   scroll-behavior: smooth;
+  /* منع تكبير iOS التلقائي وضبط اتجاه النص في المتصفحات القديمة */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -ms-overflow-style: scrollbar;
 }
 
 body {
   @apply bg-page text-ink-primary font-sans antialiased;
   text-rendering: optimizeLegibility;
   transition: background-color 0.25s ease, color 0.25s ease;
+  /* منع التمرير الأفقي الناتج عن العناصر الزخرفية على الجوال */
+  overflow-x: hidden;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+#root {
+  min-width: 0;
 }
 
 ::selection {
@@ -136,7 +148,14 @@ body {
 
   .glass {
     background: var(--color-glass);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
+  }
+
+  /* جداول قابلة للتمرير أفقيًا على الشاشات الصغيرة */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .input-base {
@@ -145,6 +164,10 @@ body {
 }
 
 @layer utilities {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -156,5 +179,53 @@ body {
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+}
+
+/* ============================================================
+   توافق المتصفحات والأجهزة
+   ============================================================ */
+
+/* أزرار تعمل باللمس بلا تكبير مزدوج على iOS */
+button,
+[role='button'],
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* منع تكبير iOS عند الكتابة في الحقول (الخط 16px على الجوال فقط) */
+@media (max-width: 640px) {
+  .input-base,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* أهداف لمس مريحة على الأجهزة اللمسية */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  [role='button'] {
+    min-height: 40px;
+  }
+  button[aria-label='close'],
+  button.no-min-target {
+    min-height: 0;
+  }
+}
+
+/* تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

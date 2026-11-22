@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, type Order } from '../lib/api';
+import { api, type Order, type StoredFileMeta } from '../lib/api';
+import { MultiFileUploader } from './MultiFileUploader';
 import { useToast } from '../lib/toast';
 import { Badge, Button, Card } from './ui';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE, formatMoney, formatDate } from '../lib/format';
@@ -11,7 +12,11 @@ export function PaymentPanel({ order, onChanged }: { order: Order; onChanged?: (
   const toast = useToast();
   const { t } = useI18n();
   const [info, setInfo] = useState<{ iban?: string | null; bankName?: string | null; instructions?: string | null; telegramLink?: string | null; whatsappNumbers?: string | string[] | null } | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [uploadedProofs, setUploadedProofs] = useState<StoredFileMeta[]>([]);
+  const [pendingProofs, setPendingProofs] = useState(0);
+  const [declaredAmount, setDeclaredAmount] = useState('');
+  const [declaredPaidAt, setDeclaredPaidAt] = useState('');
+  const [submitNote, setSubmitNote] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -24,13 +29,19 @@ export function PaymentPanel({ order, onChanged }: { order: Order; onChanged?: (
   const canPay = status === 'AWAITING_PAYMENT' || status === 'REJECTED';
   const hasReceipt = status === 'AWAITING_REVIEW' || status === 'PAID';
 
-  const upload = async () => {
-    if (!file) { toast.push('error', t('payment.chooseFirst')); return; }
+  const submitProofs = async () => {
     if (!order?.id) return;
+    if (uploadedProofs.length === 0) { toast.push('error', t('payment.chooseFirst')); return; }
+    if (pendingProofs > 0) { toast.push('info', t('uploader.status.uploading')); return; }
     setBusy(true);
     try {
-      await api.orders.receipt(order.id, file);
-      toast.push('success', t('payment.receiptSent'));
+      await api.orders.submitPayment(order.id, {
+        fileIds: uploadedProofs.map((f) => f.id),
+        declaredAmount: declaredAmount ? Number(declaredAmount) : undefined,
+        declaredPaidAt: declaredPaidAt || undefined,
+        note: submitNote || undefined,
+      });
+      toast.push('success', t('payment.proofsSent'));
       onChanged?.();
     } catch (e) {
       toast.push('error', e instanceof Error ? e.message : t('payment.receiptFailed'));
@@ -72,18 +83,59 @@ export function PaymentPanel({ order, onChanged }: { order: Order; onChanged?: (
         )}
       </div>
 
-      {canPay && (
-        <div className="mt-5 border-t border-line pt-4">
-          <p className="mb-2 text-sm font-semibold text-ink-secondary">{t('payment.uploadLabel')}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full max-w-xs rounded-md border border-line bg-elevated/60 p-2 text-xs file:me-2 file:rounded-md file:border-0 file:bg-gold-500/20 file:px-3 file:py-1.5 file:text-gold-200"
-            />
-            <Button size="sm" loading={busy} onClick={upload} disabled={!file}>{t('payment.sendReceipt')}</Button>
+      {canPay && order?.id && (
+        <div className="mt-5 space-y-3 border-t border-line pt-4">
+          <p className="text-sm font-semibold text-ink-secondary">{t('payment.proofsLabel')}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs text-ink-muted">
+              {t('payment.declaredAmount')}
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={declaredAmount}
+                onChange={(e) => setDeclaredAmount(e.target.value)}
+                placeholder={String(order.amount ?? '')}
+                className="mt-1 w-full rounded-md border border-line bg-elevated/60 p-2 text-sm text-ink-primary"
+              />
+            </label>
+            <label className="block text-xs text-ink-muted">
+              {t('payment.declaredPaidAt')}
+              <input
+                type="date"
+                value={declaredPaidAt}
+                onChange={(e) => setDeclaredPaidAt(e.target.value)}
+                className="mt-1 w-full rounded-md border border-line bg-elevated/60 p-2 text-sm text-ink-primary"
+              />
+            </label>
           </div>
+          <MultiFileUploader
+            category="PAYMENTS"
+            relatedEntityType="ORDER"
+            relatedEntityId={order.id}
+            hint={t('payment.uploadHint')}
+            onChange={(files, pending) => {
+              setUploadedProofs(files);
+              setPendingProofs(pending);
+            }}
+          />
+          <label className="block text-xs text-ink-muted">
+            {t('payment.submitNote')}
+            <textarea
+              value={submitNote}
+              onChange={(e) => setSubmitNote(e.target.value)}
+              rows={2}
+              className="mt-1 w-full rounded-md border border-line bg-elevated/60 p-2 text-sm text-ink-primary"
+            />
+          </label>
+          <Button
+            size="sm"
+            loading={busy}
+            onClick={submitProofs}
+            disabled={uploadedProofs.length === 0 || pendingProofs > 0}
+          >
+            {t('payment.submitProofs')}
+          </Button>
         </div>
       )}
 

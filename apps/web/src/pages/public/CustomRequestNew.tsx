@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { Button, Card, Form, Field, Input, Textarea, Badge } from '../../components/ui';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo } from '../../lib/seo';
 import { useI18n } from '../../i18n';
 import { IconAttachment, IconFile, IconArrowForward } from '../../components/icons';
 
@@ -147,6 +148,7 @@ export default function CustomRequestNew() {
 
   return (
     <div className="container-x max-w-3xl py-10">
+      <Seo title={t('customRequest.title')} description={t('customRequest.subtitle')} noindex />
       <PageHeader
         title={t('customRequest.title')}
         subtitle={t('customRequest.subtitle')}

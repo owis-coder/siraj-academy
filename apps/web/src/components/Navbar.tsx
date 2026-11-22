@@ -59,7 +59,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 border-b border-line/70 glass">
       <div className="container-x flex h-16 items-center gap-3">
         <Link to="/" className="flex shrink-0 items-center" aria-label={t('common.appNameFull')}>
-          <img src={logoLockup} alt={t('nav.lockupAlt')} className="h-10 w-auto" />
+          <img src={logoLockup} alt={t('nav.lockupAlt')} width={3000} height={3050} decoding="async" className="h-10 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-1 text-sm font-medium lg:flex">

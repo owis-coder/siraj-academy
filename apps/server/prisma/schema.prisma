@@ -57,6 +57,51 @@ enum ReviewStatus {
   REJECTED
 }
 
+// ---------- التخزين المركزي على Google Drive ----------
+// أنواع المجلدات: الجذور الثلاثة + مجلدات المستخدم الفرعية
+enum DriveFolderType {
+  ROOT
+  STUDENTS
+  TEACHERS
+  ADMIN_DOCUMENTS
+  PAYMENTS
+  MAIN_FILES
+  CUSTOM_REQUESTS
+  PRIVATE_EXPLANATIONS
+  COURSE_ATTACHMENTS
+  OTHER_ATTACHMENTS
+  COURSE_MATERIALS
+  LESSON_FILES
+  VIDEO_REFERENCES
+  SERVICE_ATTACHMENTS
+  ASSIGNMENT_MATERIALS
+}
+
+// تصنيف الملف نفسه (المجلد الفرعي الذي يُحفظ فيه)
+enum FileCategory {
+  PAYMENTS
+  MAIN_FILES
+  CUSTOM_REQUESTS
+  PRIVATE_EXPLANATIONS
+  COURSE_ATTACHMENTS
+  OTHER_ATTACHMENTS
+  COURSE_MATERIALS
+  LESSON_FILES
+  VIDEO_REFERENCES
+  SERVICE_ATTACHMENTS
+  ASSIGNMENT_MATERIALS
+}
+
+// دورة حياة الرفع — لا تُعدّ الملفات مكتملة قبل تأكيد Drive
+enum StoredFileStatus {
+  PENDING
+  UPLOADING
+  UPLOADED
+  FAILED
+  DELETE_PENDING
+  DELETED
+}
+
 enum ExplainRequestStatus {
   PENDING_REVIEW
   OPEN
@@ -141,18 +186,18 @@ enum AdStatus {
 }
 
 enum ServiceCategory {
-  PRIVATE_EXPLAIN        // شرح خاص
-  LIVE_EXPLAIN           // شرح مباشر
-  SUMMARY                // تلخيص (تدريب على التلخيص)
-  TRANSLATION            // ترجمة (تدريب على الترجمة)
-  PPT                    // عروض تقديمية (تدريب)
-  PROGRAMMING_PROJECT    // مشاريع برمجية (تدريب)
-  RESEARCH_REVIEW        // مراجعة بحث (توجيه)
-  PROOFREADING           // تدقيق لغوي (تدريب)
-  ACADEMIC_FORMAT        // تنسيق أكاديمي (تدريب)
-  HOMEWORK_TRAINING      // حل وتمرين واجبات
-  ACADEMIC_CONSULT       // استشارة أكاديمية
-  CUSTOM                 // مخصصة
+  PRIVATE_EXPLAIN // شرح خاص
+  LIVE_EXPLAIN // شرح مباشر
+  SUMMARY // تلخيص (تدريب على التلخيص)
+  TRANSLATION // ترجمة (تدريب على الترجمة)
+  PPT // عروض تقديمية (تدريب)
+  PROGRAMMING_PROJECT // مشاريع برمجية (تدريب)
+  RESEARCH_REVIEW // مراجعة بحث (توجيه)
+  PROOFREADING // تدقيق لغوي (تدريب)
+  ACADEMIC_FORMAT // تنسيق أكاديمي (تدريب)
+  HOMEWORK_TRAINING // حل وتمرين واجبات
+  ACADEMIC_CONSULT // استشارة أكاديمية
+  CUSTOM // مخصصة
 }
 
 enum BookingStatus {
@@ -175,62 +220,69 @@ enum AuthTokenType {
 // ---------- المستخدمون ----------
 
 model User {
-  id                     String          @id @default(cuid())
+  id                     String            @id @default(cuid())
   fullName               String
-  username               String          @unique
-  email                  String          @unique
+  username               String            @unique
+  email                  String            @unique
   passwordHash           String
   whatsapp               String?
-  role                   Role            @default(STUDENT)
-  emailVerified          Boolean         @default(false)
-  emailVerifiedAt        DateTime?       // وقت التوثيق الفعلي (للعرض وسجل التدقيق)
-  emailVerificationToken String?          @db.VarChar(255)
+  role                   Role              @default(STUDENT)
+  emailVerified          Boolean           @default(false)
+  emailVerifiedAt        DateTime? // وقت التوثيق الفعلي (للعرض وسجل التدقيق)
+  emailVerificationToken String?           @db.VarChar(255)
   universityId           String?
   majorId                String?
-  status                 UserStatus      @default(ACTIVE)
-  level                  String?         // المستوى الدراسي للطالب
-  avatarUrl              String?         // صورة الملف الشخصي (ملف محلي باسم يورده الخادم)
-  pendingEmail           String?         // بريد جديد بانتظار التحقق — لا يُعتمد تلقائيًا
-  sessionVersion         Int             @default(0) // يزداد لإبطال كل الجلسات القديمة
-  totpSecret             String?         // سر المصادقة الثنائية (TOTP base32)
-  totpEnabled            Boolean         @default(false) // هل المصادقة الثنائية مفعّلة
-  totpBackupCodes        String?         // رموز الاسترجاع الاحتياطية (تجزئات SHA-256 بتنسيق JSON)
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
+  status                 UserStatus        @default(ACTIVE)
+  level                  String? // المستوى الدراسي للطالب
+  avatarUrl              String? // صورة الملف الشخصي (ملف محلي باسم يورده الخادم)
+  isVerified             Boolean           @default(false) // علامة التوثيق الزرقاء — تمنحها الإدارة فقط
+  isVerifiedAt           DateTime? // وقت منح العلامة (سجل تدقيق)
+  isVerifiedById         String? // الأدمن الذي منح العلامة
+  verifiedBy             User?             @relation("UserVerification", fields: [isVerifiedById], references: [id], onDelete: SetNull)
+  verifiedUsers          User[]            @relation("UserVerification")
+  storedFiles            StoredFile[]      @relation("UserStoredFiles")
+  driveFolders           UserDriveFolder[]
+  pendingEmail           String? // بريد جديد بانتظار التحقق — لا يُعتمد تلقائيًا
+  sessionVersion         Int               @default(0) // يزداد لإبطال كل الجلسات القديمة
+  totpSecret             String? // سر المصادقة الثنائية (TOTP base32)
+  totpEnabled            Boolean           @default(false) // هل المصادقة الثنائية مفعّلة
+  totpBackupCodes        String? // رموز الاسترجاع الاحتياطية (تجزئات SHA-256 بتنسيق JSON)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   university University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
   major      Major?      @relation(fields: [majorId], references: [id], onDelete: SetNull)
 
-  teacherProfile         TeacherProfile?
-  explainRequests        ExplainRequest[]       @relation("StudentRequests")
-  customRequests         CustomServiceRequest[] @relation("UserCustomRequests")
-  orders                 Order[]                @relation("StudentOrders")
-  enrollments      Enrollment[]
-  paymentsReviewed Payment[]        @relation("PaymentReviewer")
-  messages         Message[]
-  chatParticipants ChatParticipant[]
-  ownedRooms       ChatRoom[]       @relation("RoomOwner")
-  notifications    Notification[]
-  liveBookings     LiveBooking[]
-  reviews          Review[]
-  favorites        Favorite[]
-  reportedChats    ChatReport[]
-  blockedBy        Block[]          @relation("BlockTarget")
-  blocking         Block[]          @relation("BlockOwner")
-  sessions         UserSession[]
-  oauthAccounts    OAuthAccount[]
-  authTokens       AuthToken[]
-  auditLogs        AuditLog[]
-  refundsRequested       RefundRequest[]         @relation("StudentRefunds")
-  refundsReviewed        RefundRequest[]         @relation("RefundReviewer")
-  withdrawalsReviewed    TeacherWithdrawal[]     @relation("WithdrawalReviewer")
-  journalEntriesCreated  FinancialJournalEntry[] @relation("JournalCreator")
-  ledgerLines            FinancialLedgerLine[]   @relation("LedgerUser")
-  adminPermissions       String[]                @default([])
-  targetRecoveries       AccountRecoveryRequest[] @relation("TargetUserRecoveries")
-  initiatedRecoveries    AccountRecoveryRequest[] @relation("RecoveryInitiator")
-  reviewedRecoveries     AccountRecoveryRequest[] @relation("RecoveryReviewer")
-  recoveryApprovals      AccountRecoveryApproval[] @relation("RecoveryApprover")
+  teacherProfile        TeacherProfile?
+  explainRequests       ExplainRequest[]          @relation("StudentRequests")
+  customRequests        CustomServiceRequest[]    @relation("UserCustomRequests")
+  orders                Order[]                   @relation("StudentOrders")
+  enrollments           Enrollment[]
+  paymentsReviewed      Payment[]                 @relation("PaymentReviewer")
+  messages              Message[]
+  chatParticipants      ChatParticipant[]
+  ownedRooms            ChatRoom[]                @relation("RoomOwner")
+  notifications         Notification[]
+  liveBookings          LiveBooking[]
+  reviews               Review[]
+  favorites             Favorite[]
+  reportedChats         ChatReport[]
+  blockedBy             Block[]                   @relation("BlockTarget")
+  blocking              Block[]                   @relation("BlockOwner")
+  sessions              UserSession[]
+  oauthAccounts         OAuthAccount[]
+  authTokens            AuthToken[]
+  auditLogs             AuditLog[]
+  refundsRequested      RefundRequest[]           @relation("StudentRefunds")
+  refundsReviewed       RefundRequest[]           @relation("RefundReviewer")
+  withdrawalsReviewed   TeacherWithdrawal[]       @relation("WithdrawalReviewer")
+  journalEntriesCreated FinancialJournalEntry[]   @relation("JournalCreator")
+  ledgerLines           FinancialLedgerLine[]     @relation("LedgerUser")
+  adminPermissions      String[]                  @default([])
+  targetRecoveries      AccountRecoveryRequest[]  @relation("TargetUserRecoveries")
+  initiatedRecoveries   AccountRecoveryRequest[]  @relation("RecoveryInitiator")
+  reviewedRecoveries    AccountRecoveryRequest[]  @relation("RecoveryReviewer")
+  recoveryApprovals     AccountRecoveryApproval[] @relation("RecoveryApprover")
 
   @@index([role])
   @@index([status])
@@ -276,9 +328,9 @@ model UserSession {
 model OAuthAccount {
   id                String   @id @default(cuid())
   userId            String
-  provider          String   // "google", etc.
-  providerSubjectId String   // معرّف sub الصادر من المزود
-  email             String?  // البريد الموثق من المزود
+  provider          String // "google", etc.
+  providerSubjectId String // معرّف sub الصادر من المزود
+  email             String? // البريد الموثق من المزود
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   lastUsedAt        DateTime @default(now())
@@ -318,24 +370,24 @@ model AuditLog {
 }
 
 model TeacherProfile {
-  id              String        @id @default(cuid())
-  userId          String        @unique
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  degree          String
-  bio             String
-  specialties     String[]
+  id               String        @id @default(cuid())
+  userId           String        @unique
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  degree           String
+  bio              String
+  specialties      String[]
   universitiesText String?
-  status          TeacherStatus @default(PENDING)
-  docsUrl         String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  status           TeacherStatus @default(PENDING)
+  docsUrl          String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  offerings    CourseOffering[]
-  services     Service[]        @relation("ServiceProvider")
-  offers       Offer[]
-  ads          Ad[]
-  liveSessions LiveSession[]
-  providedOrders Order[]        @relation("OrderProvider")
+  offerings      CourseOffering[]
+  services       Service[]             @relation("ServiceProvider")
+  offers         Offer[]
+  ads            Ad[]
+  liveSessions   LiveSession[]
+  providedOrders Order[]               @relation("OrderProvider")
   payoutMethods  TeacherPayoutMethod[]
   withdrawals    TeacherWithdrawal[]
   earnings       TeacherEarning[]
@@ -370,7 +422,7 @@ model College {
   name         String
   createdAt    DateTime @default(now())
 
-  university      University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  university      University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
   majors          Major[]
   courses         Course[]
   explainRequests ExplainRequest[]
@@ -386,8 +438,8 @@ model Major {
   name         String
   createdAt    DateTime @default(now())
 
-  university      University @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  college         College?   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  university      University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  college         College?         @relation(fields: [collegeId], references: [id], onDelete: Cascade)
   users           User[]
   courses         Course[]
   explainRequests ExplainRequest[]
@@ -397,22 +449,22 @@ model Major {
 }
 
 model Course {
-  id          String    @id @default(cuid())
+  id           String   @id @default(cuid())
   universityId String
-  collegeId   String?
-  majorId     String?
-  title       String
-  code        String?
-  level       String?
-  description String?
-  isVisible   Boolean   @default(true)
-  coverUrl    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  collegeId    String?
+  majorId      String?
+  title        String
+  code         String?
+  level        String?
+  description  String?
+  isVisible    Boolean  @default(true)
+  coverUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  university University    @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  college    College?      @relation(fields: [collegeId], references: [id], onDelete: SetNull)
-  major      Major?        @relation(fields: [majorId], references: [id], onDelete: SetNull)
+  university University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  college    College?         @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  major      Major?           @relation(fields: [majorId], references: [id], onDelete: SetNull)
   offerings  CourseOffering[]
 
   @@index([universityId])
@@ -424,24 +476,24 @@ model Course {
 // ---------- الدورات (CourseOffering) والدروس ----------
 
 model CourseOffering {
-  id            String         @id @default(cuid())
-  courseId      String
-  teacherId     String
-  title         String?
-  summary       String
-  price         Float
-  trialVideoUrl String?
-  youtubeUrls   Json?
+  id                  String         @id @default(cuid())
+  courseId            String
+  teacherId           String
+  title               String?
+  summary             String
+  price               Float
+  trialVideoUrl       String?
+  youtubeUrls         Json?
   // روابط YouTube التي اعتمدتها الإدارة فقط هي ما يظهر للطلاب
   approvedYoutubeUrls Json?
-  trialVideoStatus    ReviewStatus @default(APPROVED)
-  accessType    AccessType     @default(PAID)
-  status        OfferingStatus @default(DRAFT)
-  adminNote     String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  trialVideoStatus    ReviewStatus   @default(APPROVED)
+  accessType          AccessType     @default(PAID)
+  status              OfferingStatus @default(DRAFT)
+  adminNote           String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-  course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   teacher      TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   lessons      Lesson[]
   enrollments  Enrollment[]
@@ -455,16 +507,16 @@ model CourseOffering {
 }
 
 model Lesson {
-  id         String     @id @default(cuid())
-  offeringId String
-  title      String
-  videoUrl   String
-  access     AccessType @default(PAID)
-  order      Int        @default(0)
+  id           String       @id @default(cuid())
+  offeringId   String
+  title        String
+  videoUrl     String
+  access       AccessType   @default(PAID)
+  order        Int          @default(0)
   // لا يُعرض رابط الدرس للطلاب قبل اعتماد الإدارة
   reviewStatus ReviewStatus @default(APPROVED)
   reviewNote   String?
-  createdAt  DateTime   @default(now())
+  createdAt    DateTime     @default(now())
 
   offering CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
 
@@ -510,24 +562,24 @@ model Service {
 // ---------- طلبات الشرح والعروض ----------
 
 model ExplainRequest {
-  id           String   @id @default(cuid())
+  id           String               @id @default(cuid())
   studentId    String
   universityId String?
   collegeId    String?
   majorId      String?
   courseTitle  String
   details      String
-  type         ExplainType @default(ONLINE)
-  urgency      Urgency     @default(WEEK)
+  type         ExplainType          @default(ONLINE)
+  urgency      Urgency              @default(WEEK)
   budget       Float?
-  deadline     String?     // نص حر: "قبل منتصف الأسبوع القادم" إلخ
+  deadline     String? // نص حر: "قبل منتصف الأسبوع القادم" إلخ
   attachments  Json?
   linkUrl      String?
   status       ExplainRequestStatus @default(PENDING_REVIEW)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
-  student    User       @relation("StudentRequests", fields: [studentId], references: [id], onDelete: Cascade)
+  student    User        @relation("StudentRequests", fields: [studentId], references: [id], onDelete: Cascade)
   university University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
   college    College?    @relation(fields: [collegeId], references: [id], onDelete: SetNull)
   major      Major?      @relation(fields: [majorId], references: [id], onDelete: SetNull)
@@ -539,23 +591,23 @@ model ExplainRequest {
 }
 
 model Offer {
-  id           String      @id @default(cuid())
-  requestId    String
-  teacherId    String
-  price        Float
+  id            String      @id @default(cuid())
+  requestId     String
+  teacherId     String
+  price         Float
   // السعر الذي تعتمده الإدارة ويُعرض على الطالب (قد يختلف عن سعر المدرس)
   approvedPrice Float?
-  message      String?
-  timelineDays Int?
-  status       OfferStatus @default(PENDING)
-  adminNote    String?
-  reviewedById String?
-  reviewedAt   DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  message       String?
+  timelineDays  Int?
+  status        OfferStatus @default(PENDING)
+  adminNote     String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  request ExplainRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  teacher TeacherProfile  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  request ExplainRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([requestId, teacherId])
   @@index([teacherId])
@@ -574,15 +626,15 @@ model Order {
   title      String
   status     OrderStatus     @default(AWAITING_PAYMENT)
   notes      String?
-  providerId String?         // المدرس المستفيد (للعروض/الدورات/الجلسات/الخدمات بآداء)
+  providerId String? // المدرس المستفيد (للعروض/الدورات/الجلسات/الخدمات بآداء)
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
-  student      User            @relation("StudentOrders", fields: [studentId], references: [id], onDelete: Cascade)
-  provider     TeacherProfile? @relation("OrderProvider", fields: [providerId], references: [id], onDelete: SetNull)
-  payments     Payment[]
-  chatRooms    ChatRoom[]      @relation("RoomOrder")
-  liveBookings LiveBooking[]   @relation("BookingOrder")
+  student         User             @relation("StudentOrders", fields: [studentId], references: [id], onDelete: Cascade)
+  provider        TeacherProfile?  @relation("OrderProvider", fields: [providerId], references: [id], onDelete: SetNull)
+  payments        Payment[]
+  chatRooms       ChatRoom[]       @relation("RoomOrder")
+  liveBookings    LiveBooking[]    @relation("BookingOrder")
   refundRequests  RefundRequest[]
   teacherEarnings TeacherEarning[]
 
@@ -596,14 +648,18 @@ model Payment {
   orderId    String
   method     PaymentMethod @default(TRANSFER)
   receiptUrl String?
+  // بيانات الدفعة كما أعلنها الطالب قبل الاعتماد — لا تُعدّ دفعًا ناجحًا
+  declaredAmount Float?
+  declaredPaidAt DateTime?
+  submittedNote  String?
   status     PaymentStatus @default(UNDER_REVIEW)
   reviewerId String?
   reviewNote String?
   paidAt     DateTime?
   createdAt  DateTime      @default(now())
 
-  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  reviewer User?  @relation("PaymentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("PaymentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([status])
@@ -616,7 +672,7 @@ model ChatRoom {
   type      ChatRoomType @default(DIRECT)
   ownerId   String?
   title     String?
-  orderId   String?      // غرفة مرتبطة بطلب شرح/دورة
+  orderId   String? // غرفة مرتبطة بطلب شرح/دورة
   createdAt DateTime     @default(now())
 
   owner        User?             @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: SetNull)
@@ -652,8 +708,8 @@ model Message {
   attachmentUrl String?
   createdAt     DateTime @default(now())
 
-  room    ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  sender  User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  room    ChatRoom     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender  User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   reports ChatReport[]
 
   @@index([roomId, createdAt])
@@ -668,9 +724,9 @@ model ChatReport {
   status     ChatReportStatus @default(NEW)
   createdAt  DateTime         @default(now())
 
-  room     ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  message  Message?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
-  reporter User      @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  room     ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message  Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  reporter User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }
@@ -710,18 +766,18 @@ model Ad {
 // ---------- سجل فحص المحتوى (Content Moderation Log) ----------
 // كل محتوى مشبوه أو مرفوض يُسجَّل هنا لمراجعة الإدارة، مع سبب الرفض.
 model ContentModerationLog {
-  id             String   @id @default(cuid())
-  entityType     String   // OFFERING, LESSON, OFFER, EXPLAIN_REQUEST, CUSTOM_REQUEST, AD, PROFILE, MESSAGE, UPLOAD
+  id             String    @id @default(cuid())
+  entityType     String // OFFERING, LESSON, OFFER, EXPLAIN_REQUEST, CUSTOM_REQUEST, AD, PROFILE, MESSAGE, UPLOAD
   entityId       String?
   field          String
-  status         String   // NEEDS_REVIEW, REJECTED, APPROVED
-  reasons        Json?    // قائمة أكواد الأسباب
-  snippet        String?  // مقتطف منقّح من المحتوى (بلا بيانات حساسة كاملة)
+  status         String // NEEDS_REVIEW, REJECTED, APPROVED
+  reasons        Json? // قائمة أكواد الأسباب
+  snippet        String? // مقتطف منقّح من المحتوى (بلا بيانات حساسة كاملة)
   contentOwnerId String?
   reviewedById   String?
   decisionNote   String?
   reviewedAt     DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   @@index([entityType, entityId])
   @@index([status])
@@ -791,6 +847,84 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+// ---------- Google Drive: مجلدات المستخدمين ----------
+// سجل واحد لكل (مستخدم، نوع مجلد) — قيد Unique يمنع تكرار المجلدات.
+model UserDriveFolder {
+  id             String          @id @default(cuid())
+  userId         String
+  userRole       Role
+  folderType     DriveFolderType
+  driveFolderId  String          @unique
+  parentFolderId String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, folderType])
+  @@index([parentFolderId])
+  @@index([userRole])
+}
+
+// ---------- Google Drive: الملفات المخزنة ----------
+// البيانات الوصفية فقط — لا محتوى ولا Drive URL عام. الوصول عبر Backend بالمعرّف.
+model StoredFile {
+  id                String           @id @default(cuid())
+  ownerUserId       String
+  ownerRole         Role
+  originalFileName  String
+  storedFileName    String
+  mimeType          String
+  fileSize          Int
+  checksumSha256    String?
+  driveFileId       String?          @unique
+  driveFolderId     String?
+  driveFolderType   DriveFolderType
+  category          FileCategory
+  relatedEntityType String?
+  relatedEntityId   String?
+  uploadStatus      StoredFileStatus @default(PENDING)
+  reviewStatus      ReviewStatus     @default(PENDING_REVIEW)
+  reviewNote        String?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  idempotencyKey    String?          @unique
+  uploadSessionUrl  String?
+  failureReason     String?
+  uploadedAt        DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+
+  owner      User            @relation("UserStoredFiles", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  accessLogs FileAccessLog[]
+
+  @@index([ownerUserId, category])
+  @@index([driveFolderId])
+  @@index([uploadStatus])
+  @@index([relatedEntityType, relatedEntityId])
+  @@index([createdAt])
+}
+
+// سجل الاطلاع والتنزيل والحذف — للأدمن فقط على مستوى لوحة الإدارة
+model FileAccessLog {
+  id          String   @id @default(cuid())
+  fileId      String?
+  actorUserId String?
+  actorRole   Role?
+  action      String // VIEW | DOWNLOAD | DELETE | REVIEW | UPLOAD | RETRY
+  ip          String?
+  userAgent   String?
+  detail      String?
+  createdAt   DateTime @default(now())
+
+  file StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([fileId])
+  @@index([actorUserId])
+  @@index([createdAt])
+}
+
 // ---------- التقييمات والمفضلة ----------
 
 model Review {
@@ -824,23 +958,23 @@ model Favorite {
 // ---------- طلبات الخدمات المخصصة والشروحات غير المتوفرة ----------
 
 enum CustomRequestType {
-  COURSE_EXPLAIN      // شرح مقرر
-  TOPIC_EXPLAIN       // شرح موضوع
-  TRANSLATION         // ترجمة
-  SUMMARY             // تلخيص
-  PPT                 // عرض PowerPoint
+  COURSE_EXPLAIN // شرح مقرر
+  TOPIC_EXPLAIN // شرح موضوع
+  TRANSLATION // ترجمة
+  SUMMARY // تلخيص
+  PPT // عرض PowerPoint
   PROGRAMMING_PROJECT // مشروع برمجي تعليمي
-  OTHER               // خدمة أخرى
+  OTHER // خدمة أخرى
 }
 
 enum CustomRequestStatus {
-  NEW                 // جديد
-  UNDER_REVIEW        // قيد المراجعة
-  AWAITING_RESPONSE   // بانتظار الرد
-  ACCEPTED            // قُبل
-  REJECTED            // رُفض
-  IN_PROGRESS         // قيد التنفيذ
-  COMPLETED           // مكتمل
+  NEW // جديد
+  UNDER_REVIEW // قيد المراجعة
+  AWAITING_RESPONSE // بانتظار الرد
+  ACCEPTED // قُبل
+  REJECTED // رُفض
+  IN_PROGRESS // قيد التنفيذ
+  COMPLETED // مكتمل
 }
 
 model CustomServiceRequest {
@@ -848,16 +982,16 @@ model CustomServiceRequest {
   requestNo      String              @unique
   userId         String
   requestType    CustomRequestType   @default(COURSE_EXPLAIN)
-  title          String              // اسم المقرر أو الخدمة
-  description    String              // الوصف التفصيلي
-  universityName String?             // الجامعة المرتبطة بالطلب
-  majorName      String?             // التخصص المرتبط بالطلب
-  academicLevel  String?             // المستوى الدراسي
-  deadline       String?             // الموعد المطلوب
-  budget         Float?              // الميزانية المقترحة
-  attachments    Json?               // قائمة بالمرفقات الآمنة
+  title          String // اسم المقرر أو الخدمة
+  description    String // الوصف التفصيلي
+  universityName String? // الجامعة المرتبطة بالطلب
+  majorName      String? // التخصص المرتبط بالطلب
+  academicLevel  String? // المستوى الدراسي
+  deadline       String? // الموعد المطلوب
+  budget         Float? // الميزانية المقترحة
+  attachments    Json? // قائمة بالمرفقات الآمنة
   status         CustomRequestStatus @default(NEW)
-  adminNotes     String?             // ملاحظات داخلية للإدارة
+  adminNotes     String? // ملاحظات داخلية للإدارة
   emailSent      Boolean             @default(false)
   emailError     String?
   emailSentAt    DateTime?
@@ -876,10 +1010,10 @@ model CustomServiceRequest {
 
 model EmailLog {
   id        String   @id @default(cuid())
-  type      String   // REGISTRATION, CUSTOM_REQUEST, STATUS_UPDATE
+  type      String // REGISTRATION, CUSTOM_REQUEST, STATUS_UPDATE
   recipient String
   subject   String
-  status    String   // SENT, FAILED, SIMULATED
+  status    String // SENT, FAILED, SIMULATED
   error     String?
   metadata  Json?
   createdAt DateTime @default(now())
@@ -891,13 +1025,13 @@ model EmailLog {
 
 // ---------- قائمة العناوين المحظورة (IP Blacklist / Jail) ----------
 model BlockedIp {
-  id         String    @id @default(cuid())
-  ip         String    @unique
-  reason     String
-  bannedAt   DateTime  @default(now())
-  expiresAt  DateTime? // إذا كان null فهو حظر دائم
-  bannedBy   String    @default("SYSTEM") // SYSTEM أو معرف الأدمن
-  permanent  Boolean   @default(false)
+  id        String    @id @default(cuid())
+  ip        String    @unique
+  reason    String
+  bannedAt  DateTime  @default(now())
+  expiresAt DateTime? // إذا كان null فهو حظر دائم
+  bannedBy  String    @default("SYSTEM") // SYSTEM أو معرف الأدمن
+  permanent Boolean   @default(false)
 
   @@index([ip])
   @@index([expiresAt])
@@ -906,7 +1040,7 @@ model BlockedIp {
 // ---------- سجل الحوادث الأمنية المتقدمة (Security Incidents) ----------
 model SecurityIncident {
   id         String    @id @default(cuid())
-  eventType  String    // RATE_LIMIT_BURST, BRUTE_FORCE, CAPTCHA_FAIL, PROBING, PRIVILEGE_ATTEMPT
+  eventType  String // RATE_LIMIT_BURST, BRUTE_FORCE, CAPTCHA_FAIL, PROBING, PRIVILEGE_ATTEMPT
   severity   String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
   ip         String?
   userId     String?
@@ -1012,8 +1146,8 @@ model FinancialJournalEntry {
   type          JournalEntryType
   status        JournalEntryStatus @default(POSTED)
   currency      String             @default("SAR")
-  totalAmount   Float              // مجموع الجانب المدين (ويساوي الدائن)
-  referenceType String?            // ORDER, PAYMENT, REFUND, WITHDRAWAL
+  totalAmount   Float // مجموع الجانب المدين (ويساوي الدائن)
+  referenceType String? // ORDER, PAYMENT, REFUND, WITHDRAWAL
   referenceId   String?
   narrativeAr   String
   narrativeEn   String?
@@ -1038,7 +1172,7 @@ model FinancialLedgerLine {
   entryType      DebitCredit // DEBIT / CREDIT
   amount         Float
   currency       String      @default("SAR")
-  userId         String?     // الحساب الفرعي للطالب أو المدرس للتدقيق (Sub-ledger)
+  userId         String? // الحساب الفرعي للطالب أو المدرس للتدقيق (Sub-ledger)
   notes          String?
   createdAt      DateTime    @default(now())
 
@@ -1057,10 +1191,10 @@ model TeacherPayoutMethod {
   teacherId              String
   bankName               String
   accountHolderName      String
-  ibanEncrypted          String   // مشفر بـ AES-256-GCM (iv:authTag:ciphertext)
-  ibanMasked             String   // SA****************1234
-  accountNumberEncrypted  String?  // اختياري مشفر
-  accountNumberMasked    String?  // اختياري مقنع
+  ibanEncrypted          String // مشفر بـ AES-256-GCM (iv:authTag:ciphertext)
+  ibanMasked             String // SA****************1234
+  accountNumberEncrypted String? // اختياري مشفر
+  accountNumberMasked    String? // اختياري مقنع
   isDefault              Boolean  @default(false)
   isVerified             Boolean  @default(true)
   createdAt              DateTime @default(now())
@@ -1085,8 +1219,8 @@ model TeacherWithdrawal {
   status              WithdrawalStatus @default(PENDING)
   adminNotes          String?
   rejectionReason     String?
-  transferProofUrl    String?          // صورة إشعار الحوالة البنكية
-  transferReferenceNo String?          // الرقم المرجعي للحوالة البنكية الصادرة من حساب المنصة
+  transferProofUrl    String? // صورة إشعار الحوالة البنكية
+  transferReferenceNo String? // الرقم المرجعي للحوالة البنكية الصادرة من حساب المنصة
   transferredAt       DateTime?
   reviewerId          String?
   executedById        String?
@@ -1118,10 +1252,10 @@ model RefundRequest {
   status              RefundStatus @default(PENDING)
   adminNotes          String?
   rejectionReason     String?
-  transferProofUrl    String?      // صورة إشعار التحويل البنكي المرجع للطالب
-  transferReferenceNo String?      // الرقم المرجعي للحوالة البنكية المستردة
+  transferProofUrl    String? // صورة إشعار التحويل البنكي المرجع للطالب
+  transferReferenceNo String? // الرقم المرجعي للحوالة البنكية المستردة
   transferredAt       DateTime?
-  bankDetails         Json?        // بيانات حساب الطالب المشفرة/المقنعة لتحويل الاسترداد
+  bankDetails         Json? // بيانات حساب الطالب المشفرة/المقنعة لتحويل الاسترداد
   reviewerId          String?
   executedById        String?
   journalEntryId      String?
@@ -1144,12 +1278,12 @@ model TeacherEarning {
   orderId          String
   teacherId        String
   grossAmount      Float
-  commissionRate   Float         // لقطة النسبة الثابتة وقت الاستحقاق
+  commissionRate   Float // لقطة النسبة الثابتة وقت الاستحقاق
   commissionAmount Float
   netAmount        Float
   currency         String        @default("SAR")
   status           EarningStatus @default(AVAILABLE)
-  clearingDate     DateTime?     // موعد إتاحة الرصيد للسحب
+  clearingDate     DateTime? // موعد إتاحة الرصيد للسحب
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -1192,10 +1326,10 @@ model AccountRecoveryRequest {
   userId             String
   originalEmail      String
   alternativeEmail   String
-  reason             String                     // سبب فقدان الوصول للبريد الأصلي
+  reason             String // سبب فقدان الوصول للبريد الأصلي
   verificationMethod RecoveryVerificationMethod @default(OTHER)
-  verificationNotes  String?                    // ملاحظات الإدارة وتفاصيل التحقق
-  evidenceRef        String?                    // الرقم المرجعي أو معرف التذكرة (لا تخزين لمستندات حساسة بلا داعٍ)
+  verificationNotes  String? // ملاحظات الإدارة وتفاصيل التحقق
+  evidenceRef        String? // الرقم المرجعي أو معرف التذكرة (لا تخزين لمستندات حساسة بلا داعٍ)
   isHighRisk         Boolean                    @default(false)
   approvalRequired   Boolean                    @default(false)
   status             AccountRecoveryStatus      @default(PENDING_APPROVAL)
@@ -1227,7 +1361,7 @@ model AccountRecoveryApproval {
   id        String   @id @default(cuid())
   requestId String
   adminId   String
-  decision  String   // APPROVED, REJECTED
+  decision  String // APPROVED, REJECTED
   notes     String?
   createdAt DateTime @default(now())
 
@@ -1238,7 +1372,3 @@ model AccountRecoveryApproval {
   @@index([requestId])
   @@index([adminId])
 }
-
-
-
-

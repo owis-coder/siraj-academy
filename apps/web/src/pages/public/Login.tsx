@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { Button, Card, Form, Field, Input, PasswordInput } from '../../components/ui';
 import { useI18n } from '../../i18n';
+import { Seo } from '../../lib/seo';
 import { IconShieldKeyhole } from '../../components/icons';
 import { Recaptcha, type RecaptchaRef } from '../../components/Recaptcha';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
@@ -141,7 +142,8 @@ export default function Login() {
   if (mfaTicket) {
     return (
       <div className="container-x grid min-h-[70vh] max-w-md place-items-center py-14">
-        <Card className="w-full p-8">
+      <Seo title={t('common.login')} description={t('login.subtitle')} noindex />
+                  <Card className="w-full min-w-0 p-5 sm:p-8">
           <div className="mb-4 inline-flex size-12 items-center justify-center rounded-2xl bg-gold-400/10 text-gold-300">
             <IconShieldKeyhole className="size-6 text-gold-300" />
           </div>
@@ -188,7 +190,8 @@ export default function Login() {
 
   return (
     <div className="container-x grid min-h-[70vh] max-w-md place-items-center py-14">
-      <Card className="w-full p-8">
+      <Seo title={t('common.login')} description={t('login.subtitle')} noindex />
+                <Card className="w-full min-w-0 p-5 sm:p-8">
         <h1 className="mb-1 text-2xl font-bold">{t('login.title')}</h1>
         <p className="mb-6 text-sm text-ink-muted">{t('login.subtitle')}</p>
 

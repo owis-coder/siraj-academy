@@ -7,6 +7,7 @@ import { Button, Card, Badge, Skeleton, EmptyState, Textarea, Field, Form } from
 import { PageHeader } from '../../components/PageHeader';
 import { formatMoney, SERVICE_CATEGORY_LABEL } from '../../lib/format';
 import { useI18n } from '../../i18n';
+import { Seo, SITE_URL, breadcrumbLd, truncateMeta } from '../../lib/seo';
 
 export default function ServiceDetail() {
   const { slug = '' } = useParams();
@@ -49,6 +50,7 @@ export default function ServiceDetail() {
   if (err) {
     return (
       <div className="container-x py-16">
+        <Seo title={t('serviceDetail.loadFailed')} description={t('seo.services.desc')} noindex />
         <EmptyState
           title={t('serviceDetail.loadFailed')}
           action={<Link to="/services"><Button variant="outline">{t('serviceDetail.allServices')}</Button></Link>}
@@ -62,6 +64,32 @@ export default function ServiceDetail() {
 
   return (
     <div className="container-x py-10">
+      {!custom && s && (
+        <Seo
+          title={s.title}
+          description={truncateMeta(s.description) || t('seo.service.fallbackDesc', { title: s.title })}
+          jsonLd={[
+            {
+              '@context': 'https://schema.org',
+              '@type': 'Service',
+              name: s.title,
+              description: s.description ?? undefined,
+              serviceType: s.category,
+              inLanguage: ['ar', 'en'],
+              provider: { '@type': 'EducationalOrganization', name: 'أكاديمية سراج التعليمية', sameAs: SITE_URL },
+              areaServed: 'SA',
+              ...(s.basePrice != null
+                ? { offers: { '@type': 'Offer', price: s.basePrice, priceCurrency: 'SAR', url: `${SITE_URL}/services/${s.slug}` } }
+                : {}),
+            },
+            breadcrumbLd([
+              { name: 'الرئيسية', path: '/' },
+              { name: 'الخدمات', path: '/services' },
+              { name: s.title, path: `/services/${s.slug}` },
+            ]),
+          ]}
+        />
+      )}
       <PageHeader
         back
         title={custom ? t('serviceDetail.customTitle') : s?.title ?? t('serviceDetail.service')}

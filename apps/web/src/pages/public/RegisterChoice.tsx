@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { useI18n } from '../../i18n';
+import { Seo } from '../../lib/seo';
 import { Card } from '../../components/ui';
 import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 
@@ -91,6 +92,7 @@ export default function RegisterChoice() {
 
   return (
     <div className="container-x flex min-h-[75vh] items-center justify-center py-12">
+      <Seo title={t('common.register')} description={t('oauth.welcomeDesc')} noindex />
       <Card className="w-full max-w-lg p-6 sm:p-10 shadow-card">
         {/* رأس الصفحة مع أنيميشن متلاشي للأعلى */}
         <div className="text-center animate-fadeUp">

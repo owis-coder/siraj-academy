@@ -26,6 +26,8 @@ import adsRouter from "./routes/ads";
 import notificationsRouter from "./routes/notifications";
 import uploadsRouter from "./routes/uploads";
 import filesRouter from "./routes/files";
+import storageRouter, { storageAdminRouter } from "./routes/storage";
+import adminVerificationRouter from "./routes/adminVerification";
 import platformRouter from "./routes/platform";
 import adminRouter from "./routes/admin";
 import adminUsersRouter from "./routes/adminUsers";
@@ -35,6 +37,7 @@ import usersRouter from "./routes/users";
 import customRequestsRouter from "./routes/customRequests";
 import refundsRouter from "./routes/refunds";
 import withdrawalsRouter from "./routes/withdrawals";
+import seoRouter from "./routes/seo";
 
 export function createApp(): express.Express {
   // تهيئة عميل التخزين المشترك (Redis / Memory Fallback)
@@ -91,6 +94,9 @@ export function createApp(): express.Express {
     res.json({ data: { status: "ok", time: new Date().toISOString() } });
   });
 
+  // robots.txt و sitemap.xml (صفحات عامة فقط — لا بيانات خاصة)
+  app.use(seoRouter);
+
   // الملفات المرفوعة: تُخدم بعد تفويض (سندات الحوالة ووثائق المدرسين ليست عامة)
   app.use("/uploads", filesRouter);
 
@@ -106,6 +112,7 @@ export function createApp(): express.Express {
   api.use("/auth/email/verify-request", rateLimiters.verifyEmail);
   api.use("/auth/username-availability", rateLimiters.usernameCheck);
   api.use("/uploads", rateLimiters.upload);
+  api.use("/files", rateLimiters.upload);
   api.use("/users/me/avatar", rateLimiters.upload);
   api.use("/orders/:id/receipt", rateLimiters.upload);
   api.use("/requests", (req, res, next) => {
@@ -128,6 +135,9 @@ export function createApp(): express.Express {
   api.use("/ads", adsRouter);
   api.use("/notifications", notificationsRouter);
   api.use("/uploads", uploadsRouter);
+  api.use("/files", storageRouter);
+  api.use("/admin/storage", storageAdminRouter);
+  api.use("/admin/verification", adminVerificationRouter);
   api.use("/admin/security", adminSecurityRouter);
   api.use("/admin/users", adminUsersRouter);
   api.use("/admin", adminRouter);

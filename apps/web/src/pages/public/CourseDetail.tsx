@@ -7,6 +7,7 @@ import { Button, Card, Badge, Skeleton, EmptyState } from '../../components/ui';
 import { PageHeader } from '../../components/PageHeader';
 import { formatMoney, truncate } from '../../lib/format';
 import { useI18n } from '../../i18n';
+import { Seo, SITE_URL, breadcrumbLd, truncateMeta } from '../../lib/seo';
 import { IconPlay, IconLock } from '../../components/icons';
 
 type CourseDetail = Course & { offerings?: Offering[]; lessons?: Lesson[]; related?: Course[] };
@@ -47,6 +48,7 @@ export default function CourseDetail() {
   if (err) {
     return (
       <div className="container-x py-16">
+        <Seo title={t('courseDetail.loadFailed')} description={t('seo.courses.desc')} noindex />
         <EmptyState
           title={t('courseDetail.loadFailed')}
           action={<Link to="/courses"><Button variant="outline">{t('courseDetail.allCourses')}</Button></Link>}
@@ -97,6 +99,42 @@ export default function CourseDetail() {
 
   return (
     <div className="container-x py-10">
+      <Seo
+        title={`${course.title}${course.university?.name ? ` — ${course.university.name}` : ''}`}
+        description={
+          truncateMeta(course.description) || t('seo.course.fallbackDesc', { title: course.title })
+        }
+        type="article"
+        image={course.coverUrl ?? undefined}
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Course',
+            name: course.title,
+            description: course.description ?? t('seo.course.fallbackDesc', { title: course.title }),
+            inLanguage: ['ar', 'en'],
+            ...(course.code ? { courseCode: course.code } : {}),
+            ...(course.level ? { educationalLevel: course.level } : {}),
+            provider: { '@type': 'EducationalOrganization', name: 'أكاديمية سراج التعليمية', sameAs: SITE_URL },
+            ...(course.minPrice != null
+              ? {
+                  offers: {
+                    '@type': 'Offer',
+                    price: course.minPrice,
+                    priceCurrency: 'SAR',
+                    availability: 'https://schema.org/InStock',
+                    url: `${SITE_URL}/courses/${course.id}`,
+                  },
+                }
+              : {}),
+          },
+          breadcrumbLd([
+            { name: 'الرئيسية', path: '/' },
+            { name: 'الدورات', path: '/courses' },
+            { name: course.title, path: `/courses/${course.id}` },
+          ]),
+        ]}
+      />
       <PageHeader back title={course.title} subtitle={subtitle} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">

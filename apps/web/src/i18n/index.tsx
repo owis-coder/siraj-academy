@@ -31,10 +31,33 @@ const DICTS: Record<Lang, Dict> = {
 
 export function readStoredLang(): Lang {
   if (typeof window === 'undefined') return 'ar';
+  // رابط اللغة له الأولوية (?lang=en) — حتى تعمل صفحات SEO لكل لغة
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('lang');
+    if (fromUrl === 'en' || fromUrl === 'ar') return fromUrl;
+  } catch {
+    /* تجاهل */
+  }
   try {
     return window.localStorage.getItem(LANG_STORAGE_KEY) === 'en' ? 'en' : 'ar';
   } catch {
     return 'ar';
+  }
+}
+
+/** مزامنة اللغة مع الرابط دون إعادة تحميل (العربية = بلا معامل) */
+function syncLangInUrl(lang: Lang): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    if (lang === 'en') url.searchParams.set('lang', 'en');
+    else url.searchParams.delete('lang');
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(window.history.state, '', next);
+    }
+  } catch {
+    /* تجاهل */
   }
 }
 
@@ -66,14 +89,24 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     root.lang = lang;
     root.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.title =
-      lang === 'ar' ? 'أكاديمية سراج التعليمية' : 'Siraj Educational Academy';
+    // العنوان التفصيلي تديره مكوّنات <Seo> لكل صفحة
     try {
       window.localStorage.setItem(LANG_STORAGE_KEY, lang);
     } catch {
       /* التخزين قد يكون معطلًا */
     }
+    syncLangInUrl(lang);
   }, [lang]);
+
+  // دعم زر الرجوع/التقدم لتغيير اللغة عبر الرابط
+  useEffect(() => {
+    const onPopState = () => {
+      const fromUrl = new URLSearchParams(window.location.search).get('lang');
+      if (fromUrl === 'en' || fromUrl === 'ar') setLangState(fromUrl);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const t = useCallback(
     (key: string, vars?: Record<string, string | number>) => {

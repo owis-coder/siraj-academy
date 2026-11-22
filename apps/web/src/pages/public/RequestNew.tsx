@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, type University, type College, type Major } from '../../lib/api';
+import { api, type University, type College, type Major, type StoredFileMeta } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useToast } from '../../lib/toast';
 import { Button, Card, Form, Field, Input, Select, Textarea, Badge, Steps } from '../../components/ui';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo } from '../../lib/seo';
+import { MultiFileUploader } from '../../components/MultiFileUploader';
 import { useI18n } from '../../i18n';
 import { IconArrowForward, IconArrowBack } from '../../components/icons';
 
@@ -99,6 +101,8 @@ export default function RequestNew() {
   const [colleges, setColleges] = useState<College[]>([]);
   const [majors, setMajors] = useState<Major[]>([]);
   const [sending, setSending] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<StoredFileMeta[]>([]);
+  const [pendingUploads, setPendingUploads] = useState(0);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setF((s) => ({ ...s, [k]: v }));
 
@@ -147,7 +151,7 @@ export default function RequestNew() {
       if (!f.details.trim() || f.details.trim().length < 10) e.details = t('requestNew.detailsMin');
     }
     if (s === 3) {
-      if (f.linkUrl && !/^https?:\/\//.test(f.linkUrl)) e.linkUrl = t('requestNew.linkInvalid');
+      if (pendingUploads > 0) e.details = t('uploader.status.uploading');
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -183,8 +187,7 @@ export default function RequestNew() {
         type: f.type,
         urgency: f.urgency,
         budget: f.budget ? Number(f.budget) : undefined,
-        linkUrl: f.linkUrl || undefined,
-        attachments: [],
+        attachments: uploadedFiles.map((file) => file.id),
       });
       if (f.whatsapp && f.whatsapp !== user.whatsapp) {
         await api.account.updateProfile({ whatsapp: f.whatsapp }).catch(() => {});
@@ -200,6 +203,7 @@ export default function RequestNew() {
 
   return (
     <div className="container-x max-w-3xl py-10">
+      <Seo title={t('requestNew.title')} description={t('requestNew.subtitle')} noindex />
       <PageHeader
         title={t('requestNew.title')}
         subtitle={t('requestNew.subtitle')}
@@ -325,8 +329,20 @@ export default function RequestNew() {
         {step === 3 && (
           <Form onSubmit={submit} className="space-y-4">
             <p className="text-sm font-semibold text-gold-200">{t('requestNew.sec3')}</p>
-            <Field label={t('requestNew.attachmentLabel')} error={errors.linkUrl} hint={t('requestNew.attachmentHint')}>
-              <Input dir="ltr" value={f.linkUrl} onChange={(e) => set('linkUrl', e.target.value)} placeholder="https://…" />
+            <Field label={t('requestNew.filesLabel')} hint={t('requestNew.filesHint')}>
+              {user ? (
+                <MultiFileUploader
+                  category="PRIVATE_EXPLANATIONS"
+                  onChange={(files, pending) => {
+                    setUploadedFiles(files);
+                    setPendingUploads(pending);
+                  }}
+                />
+              ) : (
+                <p className="rounded-md border border-line bg-elevated/40 p-3 text-xs text-ink-muted">
+                  {t('requestNew.loginFirst')}
+                </p>
+              )}
             </Field>
             <div className="rounded-lg border border-line-gold bg-gold-500/5 p-4 text-sm text-ink-secondary">
               <p className="mb-2 font-semibold text-gold-200">{t('requestNew.journeyTitle')}</p>

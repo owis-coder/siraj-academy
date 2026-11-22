@@ -48,6 +48,8 @@ import { DashboardHome, Orders, OrderDetail } from './pages/dashboard/student/St
 import { MyCourses, MyRequests, StudentCustomRequests, ChatPage, Notifications, Favorites, Profile } from './pages/dashboard/student/StudentOther';
 
 import { TeacherHome, TeacherOfferings, TeacherRequests, TeacherLive, TeacherEarnings, TeacherProfileDash } from './pages/dashboard/teacher/TeacherPages';
+import TeacherFiles from './pages/dashboard/teacher/TeacherFiles';
+import AdminStorage from './pages/dashboard/admin/AdminStorage';
 
 import {
   AdminHome,
@@ -223,6 +225,7 @@ export default function App() {
               <Route path="earnings" element={<TeacherEarnings />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="profile" element={<TeacherProfileDash />} />
+              <Route path="files" element={<TeacherFiles />} />
               <Route path="*" element={<Navigate to="/teacher" replace />} />
             </Route>
 
@@ -249,6 +252,7 @@ export default function App() {
               <Route path="requests" element={<AdminRequests />} />
               <Route path="custom-requests" element={<AdminCustomRequests />} />
               <Route path="payments" element={<AdminPayments />} />
+              <Route path="storage" element={<AdminStorage />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="refunds" element={<AdminRefunds />} />
               <Route path="withdrawals" element={<AdminWithdrawals />} />

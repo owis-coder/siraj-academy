@@ -9,6 +9,7 @@ import { Badge } from './ui';
 import { ThemeToggle } from '../lib/theme';
 import { LocaleToggle } from './LocaleToggle';
 import { useI18n } from '../i18n';
+import { Seo } from '../lib/seo';
 import type { Role } from '../lib/api';
 import {
   IconDashboard,
@@ -41,7 +42,7 @@ import {
 
 export function PublicLayout() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen min-h-dvh flex-col">
       <Navbar />
       <main className="flex-1">
         <Outlet />
@@ -76,6 +77,7 @@ const NAVS: Record<Role, NavItem[]> = {
     { to: '/teacher/live', labelKey: 'dash.live', icon: IconLive },
     { to: '/teacher/earnings', labelKey: 'dash.earnings', icon: IconWallet },
     { to: '/teacher/chat', labelKey: 'dash.chats', icon: IconChat },
+    { to: '/teacher/files', labelKey: 'dash.myFiles', icon: IconOrders },
     { to: '/teacher/profile', labelKey: 'dash.professionalProfile', icon: IconProfile },
     { to: '/account/settings', labelKey: 'dash.settings', icon: IconSettings },
     { to: '/account/profile', labelKey: 'dash.profile', icon: IconIdCard },
@@ -95,6 +97,7 @@ const NAVS: Record<Role, NavItem[]> = {
     { to: '/admin/requests', labelKey: 'dash.requests', icon: IconRequests },
     { to: '/admin/custom-requests', labelKey: 'dash.customServices', icon: IconCustomRequests },
     { to: '/admin/payments', labelKey: 'dash.paymentReceipts', icon: IconPayments },
+    { to: '/admin/storage', labelKey: 'dash.fileStorage', icon: IconOrders },
     { to: '/admin/orders', labelKey: 'dash.financialOrders', icon: IconOrders },
     { to: '/admin/refunds', labelKey: 'dash.adminRefunds', icon: IconWallet },
     { to: '/admin/withdrawals', labelKey: 'dash.adminWithdrawals', icon: IconPayments },
@@ -141,9 +144,14 @@ function DashboardShell({ role }: { role: Role }) {
 
   return (
     <RoleRoute role={role}>
-      <div className="flex min-h-screen">
+      <Seo
+        title={t(ROLE_TITLE_KEY[role])}
+        description="لوحة تحكم خاصة في أكاديمية سراج — غير مخصصة للفهرسة. Private dashboard."
+        noindex
+      />
+      <div className="flex min-h-screen min-h-dvh">
         {/* Sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e border-line bg-surface/70 p-4 lg:flex">
+        <aside className="sticky top-0 hidden h-screen h-dvh w-64 shrink-0 flex-col overflow-y-auto border-e border-line bg-surface/70 p-4 lg:flex">
           <div className="mb-6 flex items-center justify-between gap-2">
             <button onClick={() => nav('/')} className="flex items-center gap-2.5 text-start">
               <LogoMark className="size-9" />

@@ -6,6 +6,7 @@ import { useDebounce } from '../../lib/useDebounce';
 import { Input, Select, Button, SkeletonGrid, EmptyState, Pagination, AnimatedCounter } from '../../components/ui';
 import { RequestCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo } from '../../lib/seo';
 import { useI18n } from '../../i18n';
 
 export default function Requests() {
@@ -76,6 +77,7 @@ export default function Requests() {
 
   return (
     <div className="container-x py-10">
+      <Seo title={t('seo.requests.title')} description={t('seo.requests.desc')} noindex />
       <PageHeader
         title={t('requests.title')}
         subtitle={t('requests.subtitle')}

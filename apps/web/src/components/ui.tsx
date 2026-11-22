@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type FormEvent } from 'react';
+import { useEffect, useState, type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type FormEvent } from 'react';
 import { useI18n } from '../i18n';
 import { IconClose, IconChevronDown, IconCheck, IconFolder, IconEye, IconEyeOff } from './icons';
 import { AnimatedCounter } from './AnimatedCounter';
@@ -192,14 +192,38 @@ export function Accordion({ items }: { items: { q: string; a: string }[] }) {
 /* ============ Modal ============ */
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
   const { t } = useI18n();
+
+  // قفل تمرير الصفحة + الإغلاق بمفتاح Escape (توافق لوحة المفاتيح والجوال)
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative max-h-[85vh] w-full overflow-y-auto rounded-lg border border-line-gold bg-surface p-6 shadow-glow animate-fadeUp ${wide ? 'max-w-3xl' : 'max-w-lg'}`}>
-        <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-ink-primary">{title}</h3>
-          <button onClick={onClose} className="grid size-8 place-items-center rounded-full border border-line text-ink-muted transition-colors hover:text-coral" aria-label={t('common.close')}>
+      <div
+        className={`relative max-h-[85vh] w-full overflow-y-auto overscroll-contain rounded-lg border border-line-gold bg-surface p-4 shadow-glow animate-fadeUp supports-[height:100dvh]:max-h-[85dvh] sm:p-6 ${
+          wide ? 'max-w-3xl' : 'max-w-lg'
+        }`}
+      >
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <h3 className="min-w-0 break-words text-lg font-bold text-ink-primary">{title}</h3>
+          <button
+            onClick={onClose}
+            className="no-min-target grid size-8 shrink-0 place-items-center rounded-full border border-line text-ink-muted transition-colors hover:text-coral"
+            aria-label={t('common.close')}
+          >
             <IconClose className="size-4" />
           </button>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Card } from '../../components/ui';
+import { Seo } from '../../lib/seo';
 
 export default function RefundPolicy() {
   useEffect(() => {
@@ -8,6 +9,10 @@ export default function RefundPolicy() {
 
   return (
     <div className="container-x max-w-4xl py-12">
+      <Seo
+        title="سياسة استرداد الأموال | Refund Policy"
+        description="شروط استرداد المبالغ في أكاديمية سراج وطرق تقديم الطلب. Siraj Academy refund terms and request process."
+      />
       <Card className="p-6 sm:p-10">
         <article className="prose-custom space-y-6 text-sm leading-8 text-ink-secondary">
           <div className="border-b border-line pb-4">

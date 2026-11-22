@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui';
 import { FAQ } from './Faq';
 import { useI18n } from '../../i18n';
+import { Seo } from '../../lib/seo';
 import { useTheme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 
@@ -12,6 +13,7 @@ export default function About() {
 
   return (
     <div className="container-x max-w-4xl py-12">
+      <Seo title={t('seo.about.title')} description={t('seo.about.desc')} />
       <div className="mb-10 text-center">
         <img
           src={theme === 'dark' ? '/brand/siraj-logo-full-dark.png' : '/brand/siraj-logo-full-light.png'}

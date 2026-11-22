@@ -41,7 +41,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="container-x grid min-h-[70vh] max-w-md place-items-center py-14">
-      <Card className="w-full p-8">
+      <Card className="w-full min-w-0 p-5 sm:p-8">
         <h1 className="mb-1 text-2xl font-bold">{t('forgot.title')}</h1>
         <p className="mb-6 text-sm text-ink-muted">{t('forgot.subtitle')}</p>
 

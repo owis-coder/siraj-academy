@@ -19,6 +19,14 @@ export function formatMoney(v: number | null | undefined): string {
   return currentLang() === 'en' ? `SAR ${amount}` : `${amount} ر.س`;
 }
 
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1) return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
+  const kb = Math.max(1, Math.round(bytes / 1024));
+  return `${kb} KB`;
+}
+
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   try {

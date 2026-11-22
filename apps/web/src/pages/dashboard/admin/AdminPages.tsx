@@ -1455,7 +1455,7 @@ export function AdminAds() {
 export function AdminSettings() {
   const { t } = useI18n();
   const toast = useToast();
-  const [v, setV] = useState<Record<string, string>>({ telegram_link: '', whatsapp_numbers: '', payment_instructions: '', iban: '', bank_name: '', commission_rate: '' });
+  const [v, setV] = useState<Record<string, string>>({ telegram_link: '', whatsapp_numbers: '', payment_instructions: '', iban: '', bank_name: '', commission_rate: '', max_file_size_mb: '100' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -1480,6 +1480,7 @@ export function AdminSettings() {
             <Field label={t('ad.iban')}><Input dir="ltr" value={v.iban ?? ''} onChange={(e) => setV((s) => ({ ...s, iban: e.target.value }))} /></Field>
             <Field label={t('ad.paymentInstructions')}><Textarea value={v.payment_instructions ?? ''} onChange={(e) => setV((s) => ({ ...s, payment_instructions: e.target.value }))} /></Field>
             <Field label={t('ad.commissionRate')} hint={t('ad.commissionHint')}><Input type="number" min={0} max={100} value={v.commission_rate ?? ''} onChange={(e) => setV((s) => ({ ...s, commission_rate: e.target.value }))} /></Field>
+            <Field label={t('ad.maxFileSize')} hint={t('ad.maxFileSizeHint')}><Input type="number" min={1} max={500} value={v.max_file_size_mb ?? ''} onChange={(e) => setV((s) => ({ ...s, max_file_size_mb: e.target.value }))} /></Field>
             <Button type="submit" loading={saving}>{t('ad.saveSettings')}</Button>
           </Form>
         </Card>

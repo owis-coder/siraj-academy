@@ -25,6 +25,10 @@ export function Footer() {
           <img
             src={theme === 'dark' ? '/brand/logo-lockup-dark.png' : '/brand/logo-lockup-light.png'}
             alt={t('nav.lockupAlt')}
+            width={3000}
+            height={3050}
+            loading="lazy"
+            decoding="async"
             className="h-12 w-auto"
           />
           <p className="max-w-md text-sm leading-7 text-ink-secondary">{t('footer.about')}</p>

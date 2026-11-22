@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { pageMeta, skipTake } from "../validation/common";
 import { multerSingle, uploadReceipt } from "../middleware/upload";
+import { audit } from "../lib/audit";
 import type { Order } from "@prisma/client";
 
 const router = Router();
@@ -114,6 +115,110 @@ function tryParseList(raw: string): string[] {
   }
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
+
+// ---------- تقديم دفعة بإثباتات متعددة من Google Drive (صاحب الطلب) ----------
+// التعديل يُحفظ على الخادم فقط، وكل تقديم يُسجَّل في سجل التدقيق.
+// لا يُعدّ الدفع مكتملًا حتى تعتمد الإدارة السند.
+router.post(
+  "/:id/payment-submission",
+  requireAuth("STUDENT"),
+  asyncHandler(async (req, res) => {
+    const { order } = await loadOrderWithAccess(req.params.id, req.user!);
+    if (order.studentId !== req.user!.id) throw forbidden("تقديم الدفعة متاح لصاحب الطلب فقط");
+    if (order.status === "PAID") throw badRequest("الطلب مكتمل الدفع");
+    if (order.status === "AWAITING_REVIEW") throw badRequest("هناك سند قيد المراجعة؛ انتظر قرار الإدارة");
+    if (order.status !== "AWAITING_PAYMENT" && order.status !== "REJECTED") {
+      throw badRequest("لا يمكن تقديم دفعة على طلب بوضعه الحالي");
+    }
+
+    const fileIds = Array.isArray(req.body?.fileIds)
+      ? (req.body.fileIds as unknown[]).map(String).slice(0, 10)
+      : [];
+    if (fileIds.length === 0) throw badRequest("أرفق إثبات دفع واحدًا على الأقل");
+
+    const declaredAmount = req.body?.declaredAmount !== undefined ? Number(req.body.declaredAmount) : null;
+    if (declaredAmount !== null && (!Number.isFinite(declaredAmount) || declaredAmount <= 0)) {
+      throw badRequest("المبلغ المعلن غير صالح");
+    }
+    const declaredPaidAtRaw = req.body?.declaredPaidAt ? String(req.body.declaredPaidAt) : null;
+    const declaredPaidAt = declaredPaidAtRaw ? new Date(declaredPaidAtRaw) : null;
+    if (declaredPaidAt && Number.isNaN(declaredPaidAt.getTime())) throw badRequest("تاريخ الدفع غير صالح");
+    const submittedNote = req.body?.note ? String(req.body.note).slice(0, 500) : null;
+
+    // الملفات يجب أن تكون للطالب نفسه، مرفوعة، ومن تصنيف PAYMENTS، وغير مرتبطة بسند آخر
+    const files = await prisma.storedFile.findMany({
+      where: {
+        id: { in: fileIds },
+        ownerUserId: req.user!.id,
+        uploadStatus: "UPLOADED",
+        category: "PAYMENTS",
+      },
+      select: { id: true, relatedEntityType: true, relatedEntityId: true, originalFileName: true },
+    });
+    if (files.length !== fileIds.length) throw badRequest("بعض الملفات غير صالحة أو لا تملكها");
+    const alreadyLinked = files.filter(
+      (f) => f.relatedEntityType === "PAYMENT" && f.relatedEntityId && f.relatedEntityId !== order.id,
+    );
+    if (alreadyLinked.length > 0) throw badRequest("أحد الملفات مرتبط بسند آخر — أعد رفعه من جديد");
+
+    const payment = await prisma.$transaction(async (tx) => {
+      const created = await tx.payment.create({
+        data: {
+          orderId: order.id,
+          method: "TRANSFER",
+          receiptUrl: null, // لا رابط عام — الوصول عبر Backend فقط
+          status: "UNDER_REVIEW",
+          declaredAmount,
+          declaredPaidAt,
+          submittedNote,
+        },
+      });
+      await tx.storedFile.updateMany({
+        where: { id: { in: fileIds }, ownerUserId: req.user!.id },
+        data: { relatedEntityType: "PAYMENT", relatedEntityId: created.id },
+      });
+      await tx.order.update({ where: { id: order.id }, data: { status: "AWAITING_REVIEW" } });
+      return created;
+    });
+
+    await audit({
+      req,
+      userId: req.user!.id,
+      actorRole: req.user!.role,
+      action: "PAYMENT_PROOF_SUBMITTED",
+      category: "ACCOUNT",
+      targetType: "Payment",
+      targetId: payment.id,
+      newValues: {
+        orderId: order.id,
+        fileIds,
+        declaredAmount,
+        declaredPaidAt: declaredPaidAt?.toISOString() ?? null,
+      },
+    });
+
+    await notifyAdmins({
+      title: "إثبات دفع جديد بانتظار المراجعة",
+      body: `${req.user!.fullName} قدّم ${fileIds.length} إثبات دفع للطلب ${order.orderNo}.`,
+      link: `/admin/payments?status=UNDER_REVIEW`,
+      type: "PAYMENT_SUBMITTED",
+    });
+    await notifyUsers({
+      userIds: [order.studentId],
+      title: "استلمنا إثبات الدفع",
+      body: `إثباتات الطلب ${order.orderNo} بانتظار مراجعة الإدارة، وسنخبرك بالنتيجة قريبًا.`,
+      type: "PAYMENT_SUBMITTED",
+    });
+
+    res.status(201).json({
+      data: {
+        payment,
+        files: files.map((f) => ({ id: f.id, originalFileName: f.originalFileName })),
+        message: "تم تقديم الدفعة؛ لا يُعدّ الدفع مكتملًا حتى اعتماد الإدارة.",
+      },
+    });
+  }),
+);
 
 // ---------- رفع سند الحوالة (صاحب الطلب، صورة) ----------
 // لا نجاح تلقائي إطلاقًا: الطلب يصبح AWAITING_REVIEW حتى تُعتمد الإدارة السند.

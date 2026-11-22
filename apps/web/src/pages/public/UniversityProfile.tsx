@@ -5,6 +5,7 @@ import { Tabs, Card, Badge, Skeleton, EmptyState, Button, AnimatedCounter } from
 import { ServiceCard, TeacherCard } from '../../components/cards';
 import { formatMoney } from '../../lib/format';
 import { useI18n } from '../../i18n';
+import { Seo, SITE_URL, breadcrumbLd, truncateMeta } from '../../lib/seo';
 import { IconArrowForward } from '../../components/icons';
 
 type UniDetail = {
@@ -40,6 +41,7 @@ export default function UniversityProfile() {
   if (loadErr) {
     return (
       <div className="container-x py-16">
+        <Seo title={t('universityProfile.loadFailed')} description={t('seo.universities.desc')} noindex />
         <EmptyState
           title={t('universityProfile.loadFailed')}
           hint={t('universityProfile.loadHint')}
@@ -68,6 +70,27 @@ export default function UniversityProfile() {
 
   return (
     <div className="container-x py-10">
+      <Seo
+        title={u?.name ?? t('seo.universities.title')}
+        description={
+          truncateMeta([u?.city, t('seo.university.fallbackDesc', { name: u?.name ?? '' })].filter(Boolean).join(' · ')) ||
+          t('seo.universities.desc')
+        }
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'CollegeOrUniversity',
+            name: u?.name,
+            url: `${SITE_URL}/universities/${slug}`,
+            ...(u?.city ? { address: { '@type': 'PostalAddress', addressLocality: u.city, addressCountry: 'SA' } } : {}),
+          },
+          breadcrumbLd([
+            { name: 'الرئيسية', path: '/' },
+            { name: 'الجامعات', path: '/universities' },
+            { name: u?.name ?? '', path: `/universities/${slug}` },
+          ]),
+        ]}
+      />
       {/* Header */}
       <Card className="relative mb-8 overflow-hidden p-8">
         <div className="hero-pattern absolute inset-0 opacity-60" aria-hidden />

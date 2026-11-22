@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Card } from '../../components/ui';
+import { Seo } from '../../lib/seo';
 
 export default function TermsOfUse() {
   useEffect(() => {
@@ -8,6 +9,10 @@ export default function TermsOfUse() {
 
   return (
     <div className="container-x max-w-4xl py-12">
+      <Seo
+        title="شروط وأحكام الاستخدام | Terms of Use"
+        description="الشروط والأحكام المنظمة لاستخدام منصة أكاديمية سراج التعليمية. Terms governing the Siraj Academy platform."
+      />
       <Card className="p-6 sm:p-10">
         <article className="prose-custom space-y-6 text-sm leading-8 text-ink-secondary">
           <div className="border-b border-line pb-4">

@@ -470,6 +470,7 @@ export interface PublishedOffer {
   status: 'APPROVED' | 'ACCEPTED';
   teacherName: string;
   teacherUsername?: string;
+  teacherVerified?: boolean;
   approvedByAdmin: true;
 }
 
@@ -689,6 +690,133 @@ export interface SecuritySettingsData {
   autoBanEnabled: boolean;
   banDurationMinutes: number;
   failedLoginThreshold: number;
+}
+
+/* ===================== الملفات والتخزين ===================== */
+
+export type UploadCategory =
+  | 'PAYMENTS'
+  | 'MAIN_FILES'
+  | 'CUSTOM_REQUESTS'
+  | 'PRIVATE_EXPLANATIONS'
+  | 'COURSE_ATTACHMENTS'
+  | 'OTHER_ATTACHMENTS'
+  | 'COURSE_MATERIALS'
+  | 'LESSON_FILES'
+  | 'VIDEO_REFERENCES'
+  | 'SERVICE_ATTACHMENTS'
+  | 'ASSIGNMENT_MATERIALS';
+
+export type StoredFileMeta = {
+  id: string;
+  originalFileName: string;
+  storedFileName: string;
+  mimeType: string;
+  fileSize: number;
+  category: UploadCategory;
+  uploadStatus: 'PENDING' | 'UPLOADING' | 'UPLOADED' | 'FAILED' | 'DELETE_PENDING' | 'DELETED';
+  reviewStatus: 'PENDING_REVIEW' | 'APPROVED' | 'NEEDS_REVISION' | 'REJECTED';
+  reviewNote?: string | null;
+  relatedEntityType?: string | null;
+  relatedEntityId?: string | null;
+  createdAt: string;
+  uploadedAt?: string | null;
+};
+
+export type StoredFileUploadMeta = {
+  category: UploadCategory;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
+  idempotencyKey?: string;
+  onProgress?: (percent: number) => void;
+};
+
+export type AdminStorageUser = {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string;
+  role: 'STUDENT' | 'TEACHER';
+  isVerified: boolean;
+  createdAt: string;
+  hasDriveFolder: boolean;
+  filesCount: number;
+};
+
+export type AdminStorageFile = StoredFileMeta & {
+  owner?: { id: string; fullName: string; username: string; role: string; isVerified?: boolean };
+  driveFileId?: string | null;
+  driveFolderId?: string | null;
+  failureReason?: string | null;
+};
+
+export type AdminStorageFileDetail = AdminStorageFile & {
+  owner: { id: string; fullName: string; username: string; email: string; role: string; isVerified?: boolean };
+  accessLogs: { id: string; action: string; actorUserId: string | null; actorRole: string | null; createdAt: string; detail: string | null }[];
+};
+
+export type StorageOverview = {
+  configured: boolean;
+  totalBytes: number;
+  byRole: { ownerRole: string; _count: { _all: number }; _sum: { fileSize: number | null } }[];
+  byCategory: { category: string; _count: { _all: number }; _sum: { fileSize: number | null } }[];
+  byStatus: { uploadStatus: string; _count: { _all: number } }[];
+  recent: { id: string; originalFileName: string; category: string; ownerRole: string; uploadStatus: string; createdAt: string }[];
+};
+
+export type StorageReconcileReport = {
+  checkedFolders: number;
+  checkedFiles: number;
+  missingInDrive: { id: string; originalFileName: string; driveFileId: string | null }[];
+  missingInDatabase: { driveFileId: string; name: string; folderId: string }[];
+  pendingUploads: number;
+  pendingDeletes: number;
+  orphanRecords: number;
+};
+
+/** رفع ملف واحد مع Progress حقيقي وإعادة استخدام مفتاح Idempotency عند إعادة المحاولة */
+export function uploadStoredFile(
+  file: File,
+  meta: StoredFileUploadMeta,
+): Promise<{ data: { files: StoredFileMeta[]; failed: { originalFileName: string; reason: string }[] } }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/files`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Accept-Language', currentLang());
+    if (meta.idempotencyKey) xhr.setRequestHeader('x-idempotency-key', meta.idempotencyKey);
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      meta.onProgress?.(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    };
+    xhr.onerror = () => reject(new ApiError(0, msg('errors.network')));
+    xhr.onabort = () => reject(new ApiError(0, msg('uploader.failed')));
+    xhr.onload = () => {
+      let json: unknown = null;
+      try {
+        json = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        json = null;
+      }
+      const payload = (json ?? {}) as { data?: { files?: StoredFileMeta[]; failed?: { originalFileName: string; reason: string }[] }; message?: string };
+      if (xhr.status >= 200 && xhr.status < 300) {
+        meta.onProgress?.(100);
+        resolve({ data: { files: payload.data?.files ?? [], failed: payload.data?.failed ?? [] } });
+        return;
+      }
+      const message = payload.message || msg('uploader.failed');
+      reject(new ApiError(xhr.status, message, payload.data?.failed));
+    };
+
+    const fd = new FormData();
+    fd.append('files', file);
+    fd.append('category', meta.category);
+    if (meta.relatedEntityType) fd.append('relatedEntityType', meta.relatedEntityType);
+    if (meta.relatedEntityId) fd.append('relatedEntityId', meta.relatedEntityId);
+    if (meta.idempotencyKey) fd.append('idempotencyKey', meta.idempotencyKey);
+    xhr.send(fd);
+  });
 }
 
 /* ===================== نقاط الاتصال ===================== */
@@ -923,6 +1051,10 @@ export const api = {
       fd.append('receipt', file);
       return request<Payment>(`/orders/${id}/receipt`, { method: 'POST', formData: fd });
     },
+    submitPayment: (
+      id: string,
+      body: { fileIds: string[]; declaredAmount?: number; declaredPaidAt?: string; note?: string },
+    ) => request<{ payment: Payment; files: { id: string; originalFileName: string }[] }>(`/orders/${id}/payment-submission`, { method: 'POST', body }),
   },
 
   chat: {
@@ -946,6 +1078,45 @@ export const api = {
       fd.append(field, file);
       return request<{ url: string }>('/uploads', { method: 'POST', formData: fd });
     },
+  },
+
+  files: {
+    mine: (query?: Record<string, string | number | undefined>) =>
+      request<StoredFileMeta[]>('/files/mine', { query }),
+    /** رفع ملف واحد مع تتبع تقدم فعلي (XHR) */
+    uploadSingle: (file: File, meta: StoredFileUploadMeta) => uploadStoredFile(file, meta),
+    remove: (id: string) => request(`/files/${id}`, { method: 'DELETE' }),
+  },
+
+  adminStorage: {
+    overview: () => request<StorageOverview>('/admin/storage/overview'),
+    health: () => request<Record<string, unknown>>('/admin/storage/health'),
+    users: (query?: Record<string, string | number | undefined>) =>
+      request<AdminStorageUser[]>('/admin/storage/users', { query }),
+    folders: (userId: string) =>
+      request<{ id: string; folderType: string; driveFolderId: string; parentFolderId: string | null; createdAt: string }[]>(
+        `/admin/storage/users/${userId}/folders`,
+      ),
+    files: (query?: Record<string, string | number | undefined>) =>
+      request<AdminStorageFile[]>('/admin/storage/files', { query }),
+    file: (id: string) => request<AdminStorageFileDetail>(`/admin/storage/files/${id}`),
+    review: (id: string, decision: 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION', note?: string) =>
+      request<StoredFileMeta>(`/admin/storage/files/${id}/review`, { method: 'POST', body: { decision, note } }),
+    remove: (id: string, reason: string) =>
+      request(`/admin/storage/files/${id}`, { method: 'DELETE', body: { reason } }),
+    retry: (id: string) => request<{ status: string }>(`/admin/storage/files/${id}/retry`, { method: 'POST' }),
+    reconcile: (userId?: string) =>
+      request<StorageReconcileReport>('/admin/storage/reconcile', { method: 'POST', body: { userId } }),
+    /** رابط تنزيل محمي بالجلسة؛ لا يكشف Drive ولا يُشارك */
+    downloadUrl: (id: string) => `${API_BASE}/admin/storage/files/${id}/download`,
+  },
+
+  verification: {
+    set: (userId: string, verified: boolean) =>
+      request<{ id: string; isVerified: boolean }>(`/admin/verification/${userId}`, {
+        method: 'POST',
+        body: { verified },
+      }),
   },
 
   notifications: {

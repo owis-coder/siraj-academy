@@ -14,6 +14,7 @@ export const SETTING_KEYS = [
   "faq", // JSON array [{q, a}]
   "service_intro",
   "admin_notification_email",
+  "max_file_size_mb", // حد حجم الملف الواحد في التخزين المركزي
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -35,6 +36,7 @@ export const DEFAULT_SETTINGS: Record<SettingKey, string> = {
   ]),
   service_intro: "خدمات تدريبية وشرح أكاديمي تقدم ضمن لوائح النزاهة الأكاديمية: شرح وتدريب وتوجيه، وليس إنجاز أعمال جاهزة للمناقشة بدل الطالب.",
   admin_notification_email: process.env.ADMIN_NOTIFICATION_EMAIL || "owisowis821@gmail.com",
+  max_file_size_mb: String(process.env.MAX_FILE_SIZE_MB || "100"),
 };
 
 export async function getSettings(): Promise<Record<string, string>> {

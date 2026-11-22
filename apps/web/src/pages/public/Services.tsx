@@ -4,6 +4,7 @@ import { api, type Service } from '../../lib/api';
 import { Button, Card, Input, Select, SkeletonGrid, EmptyState, AnimatedCounter } from '../../components/ui';
 import { ServiceCard } from '../../components/cards';
 import { PageHeader } from '../../components/PageHeader';
+import { Seo, itemListLd } from '../../lib/seo';
 import { SERVICE_CATEGORY_LABEL } from '../../lib/format';
 import { useI18n } from '../../i18n';
 import { IconArrowForward } from '../../components/icons';
@@ -41,6 +42,15 @@ export default function Services() {
 
   return (
     <div className="container-x py-10">
+      <Seo
+        title={t('seo.services.title')}
+        description={t('seo.services.desc')}
+        jsonLd={
+          items.length > 0
+            ? itemListLd(items.slice(0, 50).map((s) => ({ name: s.title, path: `/services/${s.slug}` })))
+            : undefined
+        }
+      />
       <PageHeader title={t('services.title')} subtitle={t('services.subtitle')} />
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
         <Input placeholder={t('services.searchPlaceholder')} defaultValue={q} onChange={(e) => setQ(e.target.value)} />
