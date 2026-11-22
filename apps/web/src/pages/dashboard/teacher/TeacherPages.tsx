@@ -20,11 +20,11 @@ export function TeacherHome() {
     let alive = true;
     // دوراتي عبر المسار العام mine=true، وحصصي عبر /live-sessions?mine=true
     Promise.allSettled([
-      fetch('/api/v1/offerings/mine?limit=50', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { data: [] })),
+      api.offerings.mine({ limit: 50 }),
       api.liveSessions.mine(),
     ]).then(([o, s]) => {
       if (!alive) return;
-      const od = ((o as { data?: unknown }).data ?? []) as Offering[];
+      const od = (o.status === 'fulfilled' ? o.value.data ?? [] : []) as Offering[];
       setOfferings(Array.isArray(od) ? od : []);
       setSessions(s.status === 'fulfilled' ? s.value.data ?? [] : []);
       setLoading(false);
@@ -96,10 +96,16 @@ export function TeacherOfferings() {
 
   const load = () => {
     setLoading(true);
-    fetch('/api/v1/offerings/mine?limit=50', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j: { data?: Offering[] }) => { setItems(j.data ?? []); setLoading(false); })
-      .catch(() => { setItems([]); setLoading(false); });
+    api.offerings
+      .mine({ limit: 50 })
+      .then((res) => {
+        setItems(res.data ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setItems([]);
+        setLoading(false);
+      });
     api.courses.list({}).then(({ data }) => setCourses(data ?? [])).catch(() => setCourses([]));
   };
   useEffect(load, []);
@@ -442,7 +448,13 @@ export function TeacherLive() {
     setLoading(true);
     api.liveSessions.mine().then(({ data }) => { setItems(data ?? []); setLoading(false); }).catch(() => { setItems([]); setLoading(false); });
   };
-  useEffect(() => { load(); fetch('/api/v1/offerings/mine?limit=50', { credentials: 'include' }).then((r) => (r.ok ? r.json() : { data: [] })).then((j: { data?: Offering[] }) => setOfferings(j.data ?? [])).catch(() => setOfferings([])); }, []);
+  useEffect(() => {
+    load();
+    api.offerings
+      .mine({ limit: 50 })
+      .then((res) => setOfferings(res.data ?? []))
+      .catch(() => setOfferings([]));
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -1034,16 +1046,7 @@ export function TeacherProfileDash() {
     try {
       if (file.size > 25 * 1024 * 1024) throw new Error(t('td.maxFile25'));
       const { data } = await api.uploads.create(file);
-      const res = await fetch('/api/v1/teacher/verification-docs', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ docsUrl: data.url }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(body.message ?? t('td.docsSaveFailed'));
-      }
+      await api.teacher.updateVerificationDocs(data.url);
       setDocsUrl(data.url);
       toast.push('success', t('td.docsUploaded'));
       await refresh();
@@ -1073,16 +1076,7 @@ export function TeacherProfileDash() {
         <Form onSubmit={async () => {
           setSaving(true);
           try {
-            const res = await fetch(`/api/v1/teacher/profile`, {
-              method: 'PATCH',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ degree, specialties, bio, universitiesText }),
-            });
-            if (!res.ok) {
-              const body = (await res.json().catch(() => ({}))) as { message?: string };
-              throw new Error(body.message ?? t('td.saveCheck'));
-            }
+            await api.teacher.updateProfile({ degree, specialties, bio, universitiesText });
             toast.push('success', t('td.updated'));
             await refresh();
           } catch (e) {

@@ -871,6 +871,8 @@ export const api = {
   },
 
   offerings: {
+    mine: (query?: { limit?: number; page?: number; status?: string; q?: string }) =>
+      request<Offering[]>('/offerings/mine', { query }),
     create: (body: Record<string, unknown>) => request<Offering>('/offerings', { method: 'POST', body }),
     submit: (id: string) => request<Offering>(`/offerings/${id}/submit`, { method: 'POST' }),
     update: (id: string, body: Record<string, unknown>) => request<Offering>(`/offerings/${id}`, { method: 'PATCH', body }),
@@ -892,6 +894,10 @@ export const api = {
   },
 
   teacher: {
+    updateProfile: (body: { degree?: string; specialties?: string | string[]; bio?: string; universitiesText?: string }) =>
+      request<{ user?: User; profile?: TeacherProfile }>('/teacher/profile', { method: 'PATCH', body }),
+    updateVerificationDocs: (docsUrl: string) =>
+      request<{ docsUrl?: string }>('/teacher/verification-docs', { method: 'PATCH', body: { docsUrl } }),
     earnings: () =>
       request<{
         gross?: number;
