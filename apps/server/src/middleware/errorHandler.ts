@@ -14,6 +14,68 @@ function sanitizeMessage(m: string): string {
   return m;
 }
 
+/** فحص وتصنيف أخطاء Prisma وقواعد البيانات لتفادي أخطاء 500 غير المفسرة */
+function handleDatabaseError(err: any, res: Response): boolean {
+  if (!err || typeof err !== "object") return false;
+
+  const isPrismaError =
+    err.name === "PrismaClientKnownRequestError" ||
+    err.name === "PrismaClientInitializationError" ||
+    err.name === "PrismaClientRustPanicError" ||
+    err.name === "PrismaClientUnknownRequestError" ||
+    typeof err.code === "string" && err.code.startsWith("P");
+
+  if (!isPrismaError) return false;
+
+  const code = String(err.code || "");
+
+  // تسجيل خطأ القاعدة داخليًا بصورة آمنة دون طباعة أسرار أو كلمات مرور
+  console.error(`[DATABASE_ERROR] code=${code} name=${err.name} message=${sanitizeMessage(err.message)}`);
+
+  // انتهاء مهلة الاتصال أو القفل (Database Advisory Lock / Query Timeout)
+  if (code === "P1002" || code === "P1008") {
+    res.status(504).json({
+      message: "انتهت مهلة استجابة قاعدة البيانات. يُرجى إعادة المحاولة بعد لحظات.",
+      error: { code: "DATABASE_TIMEOUT" },
+    });
+    return true;
+  }
+
+  // تعذر الاتصال بالخادم أو انقطاع الاتصال أو امتلاء المجمع (Pool Timeout)
+  if (code === "P1001" || code === "P1017" || code === "P2024" || err.name === "PrismaClientInitializationError") {
+    res.status(503).json({
+      message: "خدمة قاعدة البيانات غير متاحة مؤقتًا أو تحت ضغط عالٍ. يُرجى المحاولة لاحقًا.",
+      error: { code: "DATABASE_UNAVAILABLE" },
+    });
+    return true;
+  }
+
+  // انتهاك القيد الفريد (Unique Constraint Violation)
+  if (code === "P2002") {
+    const target = Array.isArray(err.meta?.target) ? err.meta.target.join(", ") : "الحقل";
+    res.status(409).json({
+      message: `قيمة ${target} مسجلة مسبقًا في النظام.`,
+      error: { code: "DUPLICATE_ENTRY", target },
+    });
+    return true;
+  }
+
+  // السجل المطلوب غير موجود للتعديل أو الحذف
+  if (code === "P2025") {
+    res.status(404).json({
+      message: "السجل المطلوب غير موجود أو تم حذفه مسبقًا.",
+      error: { code: "RECORD_NOT_FOUND" },
+    });
+    return true;
+  }
+
+  res.status(503).json({
+    message: "تعذر إتمام العملية بسبب انشغال قاعدة البيانات. يُرجى المحاولة بعد قليل.",
+    error: { code: "DATABASE_ERROR" },
+  });
+  return true;
+}
+
 // معالج الأخطاء المركزي: يحوّل Zod/HTTP/الأخطاء غير المتوقعة إلى شكل موحد { message, details? }
 // ويضمن عدم كشف أي تفاصيل تقنية داخلية أو أخطاء قواعد البيانات للمستخدم
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
@@ -24,6 +86,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       ...(err.code ? { error: { code: err.code } } : {}),
       ...(err.details ? { details: err.details } : {}),
     });
+    return;
+  }
+
+  // معالجة أخطاء Prisma وقواعد البيانات بحالات HTTP دقيقة (503/504/409/404)
+  if (handleDatabaseError(err, res)) {
     return;
   }
 
@@ -41,6 +108,15 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // أخطاء انتهاء المهلة لطلبات Fetch أو الشبكة الخارجية (AbortController Timeout)
+  if (typeof err === "object" && err !== null && (err as { name?: string }).name === "AbortError") {
+    res.status(504).json({
+      message: "انتهت مهلة الاتصال بالخدمة الخارجية. يرجى إعادة المحاولة.",
+      error: { code: "GATEWAY_TIMEOUT" },
+    });
+    return;
+  }
+
   // multer: تجاوز حدود الحجم / نوع الملف
   if (typeof err === "object" && err !== null) {
     const e = err as { code?: string; message?: string };
@@ -54,8 +130,15 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     }
   }
 
-  console.error("[error] خطأ غير متوقع:", err);
-  res.status(500).json({ message: "حدث خطأ غير متوقع على الخادم" });
+  // تسجيل آمن للخطأ الداخلي بدون طباعة أي أسرار أو كلمات سر أو توكنز
+  const safeErrName = (err as Error)?.name || "UnknownError";
+  const safeErrMsg = sanitizeMessage((err as Error)?.message || String(err));
+  console.error(`[SERVER:ERROR] ${safeErrName}: ${safeErrMsg}`);
+
+  res.status(500).json({
+    message: "حدث خطأ غير متوقع على الخادم. يُرجى إعادة المحاولة لاحقًا.",
+    error: { code: "INTERNAL_SERVER_ERROR" },
+  });
 }
 
 // غلاف للتخلص من try/catch المتكرر في المسارات

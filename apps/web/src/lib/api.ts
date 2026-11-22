@@ -78,6 +78,9 @@ function qs(query?: Options['query']) {
 
 export async function request<T>(path: string, opts: Options = {}): Promise<{ data: T; meta?: Meta }> {
   const { method = 'GET', body, query, formData, headers } = opts;
+  const csrfMatch = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)siraj_csrf=([^;]+)/) : null;
+  const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : undefined;
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}${qs(query)}`, {
@@ -86,6 +89,7 @@ export async function request<T>(path: string, opts: Options = {}): Promise<{ da
       headers: {
         'Accept-Language': currentLang(),
         ...(formData ? {} : body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
         ...headers,
       },
       body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),

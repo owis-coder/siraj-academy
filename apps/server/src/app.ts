@@ -1,8 +1,9 @@
 import express from "express";
 import crypto from "crypto";
 import cookieParser from "cookie-parser";
-import cors from "cors";
 
+import { strictCorsMiddleware } from "./lib/cors";
+import { csrfProtection } from "./middleware/csrf";
 import { errorHandler } from "./middleware/errorHandler";
 import { localizeResponses } from "./lib/i18n";
 import { prisma } from "./lib/prisma";
@@ -75,13 +76,11 @@ export function createApp(): express.Express {
 
   app.use(cookieParser());
 
-  // CORS للواجهة الأمامية مع كوكي
-  app.use(
-    cors({
-      origin: CLIENT_URL === "*" ? true : CLIENT_URL.split(",").map((s) => s.trim()),
-      credentials: true,
-    }),
-  );
+  // سياسة CORS الصارمة (حظر عكس الأصول العشوائية أو استخدام Wildcard مع الاعتماديات)
+  app.use(strictCorsMiddleware);
+
+  // حماية CSRF الشاملة للطلبات المغيرة للحالة
+  app.use(csrfProtection);
 
   app.use(express.json({ limit: "5mb" }));
   app.use(express.urlencoded({ extended: true, limit: "5mb" }));

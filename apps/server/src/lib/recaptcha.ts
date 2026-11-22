@@ -77,6 +77,7 @@ export const recaptchaService = {
     const secretKey = process.env.RECAPTCHA_SECRET_KEY;
     if (!secretKey) {
       if (isProduction) {
+        console.error("[AUTH:CAPTCHA] Missing RECAPTCHA_SECRET_KEY in production environment (Fail-Closed).");
         return {
           success: false,
           error: "إعدادات حماية Google reCAPTCHA غير مكتملة في بيئة الإنتاج (Fail-Closed).",

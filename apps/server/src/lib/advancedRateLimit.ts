@@ -119,12 +119,22 @@ export function createAdvancedRateLimiter(options: RateLimitOptions): RequestHan
 
 // حدود جاهزة مخصصة حسب طبيعة كل عملية
 export const rateLimiters = {
-  /** تسجيل الدخول: 5 محاولات / 5 دقائق لكل IP أو حساب */
+  /** تسجيل الدخول: 5 محاولات / 5 دقائق مقيدة بالـ IP وهوية الحساب */
   login: createAdvancedRateLimiter({
     name: "auth_login",
     windowMs: 5 * 60 * 1000,
     max: 5,
     message: "محاولات دخول متكررة؛ انتظر 5 دقائق للحماية من محاولات التخمين.",
+    keyGenerator: (req) => {
+      const clientIp = getTrustedClientIp(req);
+      const subnet = getSubnetIdentifier(clientIp);
+      const idRaw = (req.body && typeof req.body === "object" ? req.body.identifier : "") || "";
+      if (typeof idRaw === "string" && idRaw.trim()) {
+        const idHash = crypto.createHash("sha256").update(idRaw.trim().toLowerCase()).digest("hex").slice(0, 16);
+        return `login:${subnet}:${idHash}`;
+      }
+      return `ip:${subnet}`;
+    },
   }),
 
   /** التحقق من رمز المصادقة الثنائية (MFA): 5 محاولات / 5 دقائق */
@@ -154,12 +164,22 @@ export const rateLimiters = {
     message: "تم إنشاء عدة حسابات من هذا العنوان مؤخرًا. انتظر قليلًا ثم أعد المحاولة.",
   }),
 
-  /** استعادة كلمة المرور: 3 طلبات / 15 دقيقة */
+  /** استعادة كلمة المرور: 3 طلبات / 15 دقيقة مقيدة بالـ IP والبريد */
   forgotPassword: createAdvancedRateLimiter({
     name: "auth_forgot",
     windowMs: 15 * 60 * 1000,
     max: 3,
     message: "طلبات استعادة كثيرة لهذا الحساب أو العنوان؛ انتظر 15 دقيقة للحماية من الإغراق.",
+    keyGenerator: (req) => {
+      const clientIp = getTrustedClientIp(req);
+      const subnet = getSubnetIdentifier(clientIp);
+      const emailRaw = (req.body && typeof req.body === "object" ? req.body.email : "") || "";
+      if (typeof emailRaw === "string" && emailRaw.trim()) {
+        const emailHash = crypto.createHash("sha256").update(emailRaw.trim().toLowerCase()).digest("hex").slice(0, 16);
+        return `forgot:${subnet}:${emailHash}`;
+      }
+      return `ip:${subnet}`;
+    },
   }),
 
   /** توثيق البريد الإلكتروني: 5 طلبات / ساعة */
@@ -186,12 +206,12 @@ export const rateLimiters = {
     message: "عمليات رفع متتابعة كثيرة؛ انتظر لحظات ثم استكمل الرفع.",
   }),
 
-  /** فحص توفر اسم المستخدم: 120 طلب / دقيقة لضمان سلاسة وسرعة الكتابة للمستخدم */
+  /** فحص توفر اسم المستخدم: 25 طلب / دقيقة للحد من محاولات التعداد الآلي (Username Enumeration) مع الحفاظ على تجربة مستخدم سلسة */
   usernameCheck: createAdvancedRateLimiter({
     name: "username_check",
     windowMs: 60 * 1000,
-    max: 120,
-    message: "فحوصات كثيرة لاسم المستخدم. انتظر لحظة ثم أعد المحاولة.",
+    max: 25,
+    message: "فحوصات كثيرة لاسم المستخدم من هذا العنوان. انتظر دقيقة ثم أعد المحاولة.",
   }),
 
   /** لوحة الإدارة: 150 طلب / دقيقة */

@@ -13,6 +13,7 @@ import { asyncHandler } from "../middleware/errorHandler";
 import { audit } from "../lib/audit";
 import { appBaseUrl, issueToken, revokeTokens } from "../lib/authTokens";
 import { multerSingle, uploadAvatar, UPLOAD_ROOT } from "../middleware/upload";
+import { sanitizePlainText } from "../lib/sanitizeInput";
 import {
   changeEmailSchema,
   updateProfileSchema,
@@ -122,7 +123,7 @@ const updateProfile = asyncHandler(async (req, res) => {
   const updated = await prisma.user.update({
     where: { id: current.id },
     data: {
-      ...(data.fullName !== undefined ? { fullName: data.fullName } : {}),
+      ...(data.fullName !== undefined ? { fullName: sanitizePlainText(data.fullName) } : {}),
       ...(data.whatsapp !== undefined ? { whatsapp: data.whatsapp } : {}),
       // التخصص يتبع الجامعة: تحديث الجامعة يعيد ضبط التخصص معها
       ...(data.universityId !== undefined

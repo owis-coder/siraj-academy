@@ -991,6 +991,7 @@ router.post("/logout", (req, res) => {
 
   const done = () => {
     res.clearCookie(COOKIE_NAME, cookieOptions());
+    res.clearCookie("siraj_csrf", { ...cookieOptions(), httpOnly: false });
     res.json({ data: { message: "تم تسجيل الخروج" } });
   };
 
@@ -1286,15 +1287,23 @@ router.post(
     const { raw, expiresAt } = await issueToken(user.id, "PASSWORD_RESET");
     const link = `${APP_BASE_URL}/reset-password?token=${raw}`;
 
-    const mail = await sendMail({
-      to: user.email,
-      subject: "إعادة تعيين كلمة المرور — أكاديمية سراج",
-      text:
-        `مرحبًا ${user.fullName}،\n\n` +
-        `طلبنا إعادة تعيين كلمة المرور لحسابك. الرابط صالح لمدة 30 دقيقة ويُستخدم مرة واحدة فقط:\n${link}\n\n` +
-        `إن لم تطلب ذلك فتجاهل الرسالة؛ لن يتغير شيء في حسابك. لا تشارك هذا الرابط مع أي شخص.`,
-      type: "GENERAL",
-    });
+    let mailDelivered = false;
+    let mailSimulated = false;
+    try {
+      const mail = await sendMail({
+        to: user.email,
+        subject: "إعادة تعيين كلمة المرور — أكاديمية سراج",
+        text:
+          `مرحبًا ${user.fullName}،\n\n` +
+          `طلبنا إعادة تعيين كلمة المرور لحسابك. الرابط صالح لمدة 30 دقيقة ويُستخدم مرة واحدة فقط:\n${link}\n\n` +
+          `إن لم تطلب ذلك فتجاهل الرسالة؛ لن يتغير شيء في حسابك. لا تشارك هذا الرابط مع أي شخص.`,
+        type: "GENERAL",
+      });
+      mailDelivered = Boolean(mail.delivered);
+      mailSimulated = Boolean(mail.simulated);
+    } catch (mailErr) {
+      console.error("[AUTH:MAIL_ERROR] Failed to send password reset email:", (mailErr as Error)?.message);
+    }
 
     await audit({
       req,
@@ -1306,7 +1315,7 @@ router.post(
       targetId: user.id,
       result: "SUCCESS",
       // الرمز وكلمة المرور لا يُسجَّلان إطلاقًا
-      newValues: { expiresAt: expiresAt.toISOString(), delivery: mail.delivered ? "SENT" : mail.simulated ? "SIMULATED" : "FAILED" },
+      newValues: { expiresAt: expiresAt.toISOString(), delivery: mailDelivered ? "SENT" : mailSimulated ? "SIMULATED" : "FAILED" },
     });
 
     res.json(generic);

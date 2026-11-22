@@ -8,6 +8,7 @@ import { asyncHandler } from "../middleware/errorHandler";
 import { createRoomSchema, messageListSchema, sendMessageSchema, reportRoomSchema } from "../validation/chat";
 import { getOrCreateSupportUser, ensureUserSupportRoom, SUPPORT_FULL_NAME } from "../lib/supportChat";
 import { ContentModerationService } from "../lib/contentModeration";
+import { sanitizePlainText } from "../lib/sanitizeInput";
 
 const router = Router();
 
@@ -337,7 +338,7 @@ router.post(
     }
 
     const message = await prisma.message.create({
-      data: { roomId, senderId: req.user!.id, body, attachmentUrl },
+      data: { roomId, senderId: req.user!.id, body: body ? sanitizePlainText(body) : body, attachmentUrl },
       include: { sender: { select: { id: true, fullName: true, username: true, role: true } } },
     });
 
